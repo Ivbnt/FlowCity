@@ -9,6 +9,8 @@ import { renderPanel, chatBubble } from './panels.js';
 import { Linker } from './linker.js';
 import { describe, isLinear } from '../shared/simple.mjs';
 import { logoSvg } from './logo.js';
+import { peoplePanel } from './people.js';
+import { permsOf, roleOf } from '../shared/people.mjs';
 import { h, $, put, toast, modal, guard, confirmBox, fmtMinutes } from './dom.js';
 import { BUILDINGS, BUILDING_CATEGORIES, buildingDef, levelOf, levelProgress, providersOf } from '../shared/buildings.mjs';
 import { canPlace, savedMinutes } from '../shared/city.mjs';
@@ -18,6 +20,9 @@ import { reachable } from '../shared/engine.mjs';
 
 const state = { draft: null, view: null, status: null, city: null, world: null, selected: null, selectedArg: null, category: 'essentiels', tool: { kind: 'select' }, editor: null, runs: new Map(), chat: { history: [], log: null } };
 const city = () => state.city;
+// Droits de la personne connectée dans la ville ouverte
+const me = () => state.status?.session?.email;
+const perms = () => permsOf(city(), me());
 const app = $('#app');
 
 // ---------- Démarrage ----------
@@ -157,7 +162,7 @@ async function start() {
     if (e.key.toLowerCase() === 'v' && !state.editor) state.world.setMode(state.world.mode === 'pov' ? 'orbit' : 'pov');
   });
   refresh();
-  if (!city().buildings.length && !city().profile) welcome();
+  if (!city().buildings.length && !city().profile && roleOf(city(), me())?.id === 'createur') welcome();
 }
 
 function refresh() {
@@ -170,7 +175,7 @@ function refresh() {
     const b = city().buildings.find((x) => x.id === state.selected);
     if (!b) select(null);
     else if (!state.editor && !$('#fc-panel').contains(document.activeElement)) renderSelected();
-  }
+  } else if (state.view) renderSelected(); // listes (automatisations, habitants) à jour
 }
 
 // ---------- Barre du haut ----------
@@ -186,11 +191,12 @@ function renderTop() {
   if (!c.sandbox) chips.unshift(h('span', { class: 'fc-chip-stat gold', title: 'Crédits' }, '🪙 ', c.credits), h('span', { class: 'fc-chip-stat lvl', title: `${c.xp} XP` }, `Niv. ${lp.level} · ${lp.name}`, h('i', { style: { width: `${lp.pct * 100}%` } })));
   else chips.unshift(h('span', { class: 'fc-chip-stat', title: 'Mode bac à sable : tout est débloqué (change-le à la Mairie)' }, '🧱 Bac à sable'));
   put($('#fc-top'), 
-    h('div', { class: 'fc-brand' }, logoSvg(36), h('div', {}, h('b', {}, c.name), h('small', {}, st.session?.guest ? 'Flowcity · visite' : 'Flowcity'))),
+    h('button', { class: 'fc-brand', title: 'Changer de ville / habitants', onclick: (e) => cityMenu(e.currentTarget) }, logoSvg(36), h('div', {}, h('b', {}, c.name), h('small', {}, `${roleOf(c, me())?.emoji || ''} ${roleOf(c, me())?.name || ''}${st.session?.guest ? ' · visite' : ''}`))),
     h('div', { class: 'fc-stats-row' }, ...chips),
     h('div', { class: 'fc-top-actions' },
-      h('button', { class: 'fc-btn primary', title: 'Créer une automatisation en cliquant sur tes bâtiments', onclick: () => startLinking() }, '🔗 Relier des bâtiments'),
+      perms().automate ? h('button', { class: 'fc-btn primary', title: 'Créer une automatisation en cliquant sur tes bâtiments', onclick: () => startLinking() }, '🔗 Relier des bâtiments') : null,
       h('button', { class: 'fc-btn', onclick: () => showAutomations() }, '📋 Mes automatisations'),
+      h('button', { class: 'fc-btn', title: 'Les personnes de la ville et leurs rôles', onclick: () => showPeople() }, '👥 ', String(c.people.length)),
       h('button', { class: `fc-btn ${state.world?.mode === 'pov' ? 'on' : ''}`, title: 'Se balader à pied dans la ville (V)', onclick: () => state.world.setMode(state.world.mode === 'pov' ? 'orbit' : 'pov') }, state.world?.mode === 'pov' ? '🗺️ Vue d’ensemble' : '🚶 Balade'),
       h('button', { class: 'fc-btn ghost', title: 'Jour / nuit', onclick: () => state.world.setNight(state.world.nightTarget > 0.5 ? 0 : 1) }, state.world?.nightTarget > 0.5 ? '☀️' : '🌙'),
       h('button', { class: 'fc-avatar-btn', title: st.session?.email || '', onclick: () => openPlace('mairie') }, st.session?.picture ? h('img', { src: st.session.picture, alt: '' }) : '👤'),
@@ -202,6 +208,7 @@ function renderTop() {
 function renderMission() {
   const c = city();
   const el = $('#fc-mission');
+  if (!perms().build && !perms().automate) return put(el); // les missions servent à apprendre à construire
   if (state.missionHidden) return put(el, h('button', { class: 'fc-mission-mini', onclick: () => ((state.missionHidden = false), renderMission()) }, '🎓'));
   const ms = missionStatus(c);
   const m = ms.current;
@@ -221,6 +228,12 @@ function renderBuildBar() {
   const c = city();
   const lvl = levelOf(c.xp);
   const bar = $('#fc-build');
+  if (!perms().build) {
+    const r = roleOf(c, me());
+    put(bar, h('div', { class: 'fc-build-locked' }, h('span', {}, r?.emoji || '🔒'), h('div', {}, h('b', {}, `Tu es ${r?.name || 'visiteur'} dans cette ville`), h('small', {}, 'Ton rôle ne permet pas de construire. Clique sur les bâtiments pour les découvrir, ou balade-toi à pied (🚶).'))));
+    if (state.tool.kind !== 'select') setTool({ kind: 'select' });
+    return;
+  }
   const tools = h('div', { class: 'fc-tools' },
     toolBtn('select', '👆', 'Sélection'),
     toolBtn('road', '🛣️', 'Route'),
@@ -296,6 +309,8 @@ function ctxObj() {
     startLinking,
     linkable: (b) => (state.linker.opsOf(b, 'trigger').length ? 'trigger' : state.linker.opsOf(b, 'action').length ? 'action' : null),
     openPlace,
+    openPeople: () => showPeople(),
+    perms,
     startBuild,
     chooseProfile,
     refreshStatus: async () => {
@@ -319,6 +334,11 @@ function select(id, arg) {
 }
 function renderSelected() {
   const panel = $('#fc-panel');
+  if (state.view === 'people' && !state.selected) {
+    put(panel, ...peoplePanel({ api, city, status: () => state.status, close: () => ((state.view = null), renderSelected()) }));
+    panel.classList.remove('hidden');
+    return;
+  }
   if (state.view === 'automations' && !state.selected) {
     put(panel, ...automationsPanel());
     panel.classList.remove('hidden');
@@ -354,6 +374,7 @@ function openPlace(type, arg) {
 // ---------- Relier des bâtiments (mode simple) ----------
 function startLinking(opts = {}) {
   const c = city();
+  if (!perms().automate) return toast(`Ton rôle (${roleOf(c, me())?.name}) ne permet pas de créer ou modifier des automatisations.`, 'warn');
   if (!c.buildings.some((b) => b.type === 'mairie')) return toast('Construis d’abord ta Mairie (onglet Essentiels) : elle sert d’horloge et de bouton de départ.', 'warn');
   if (state.world.mode === 'pov') state.world.setMode('orbit');
   if (state.editor) state.editor.close();
@@ -361,6 +382,33 @@ function startLinking(opts = {}) {
   state.view = null;
   select(null);
   state.linker.start(opts);
+}
+function showPeople() {
+  if (state.linker.active) state.linker.close();
+  state.selected = null;
+  state.view = 'people';
+  renderSelected();
+}
+// Changer de ville (si on fait partie de plusieurs)
+async function cityMenu(anchor) {
+  const list = await api.city.list();
+  if (list.length < 2) return showPeople();
+  const pop = h('div', { class: 'fc-city-menu fc-sheet' },
+    h('small', { class: 'fc-muted' }, 'Tes villes'),
+    ...list.map((x) => h('button', { class: x.key === state.status.city ? 'on' : '', onclick: async () => {
+      pop.remove();
+      if (x.key === state.status.city) return;
+      state.city = await api.city.switch(x.key);
+      state.status = await api.status();
+      select(null);
+      refresh();
+      toast(`Bienvenue à ${x.name} (${x.role})`, 'ok');
+    } }, h('b', {}, x.name), h('small', {}, x.mine ? 'ta ville' : `de ${x.owner} · ${x.role}`))),
+  );
+  document.body.append(pop);
+  const r = anchor.getBoundingClientRect();
+  Object.assign(pop.style, { left: `${r.left}px`, top: `${r.bottom + 6}px` });
+  setTimeout(() => document.addEventListener('pointerdown', (e) => !pop.contains(e.target) && pop.remove(), { once: true }));
 }
 function showAutomations() {
   if (state.linker.active) state.linker.close();
@@ -375,23 +423,23 @@ function automationsPanel() {
     const sentence = describe(w, c);
     return h('div', { class: `fc-auto ${w.enabled ? 'on' : ''}` },
       h('div', { class: 'fc-row' },
-        h('label', { class: 'fc-switch', title: w.enabled ? 'En marche' : 'À l’arrêt' }, h('input', { type: 'checkbox', checked: w.enabled, onchange: (e) => guard(() => api.city.act({ type: 'workflow.toggle', id: w.id, enabled: e.target.checked })) }), h('span', {})),
+        h('label', { class: 'fc-switch', title: w.enabled ? 'En marche' : 'À l’arrêt' }, h('input', { type: 'checkbox', checked: w.enabled, disabled: !perms().run, onchange: (e) => guard(() => api.city.act({ type: 'workflow.toggle', id: w.id, enabled: e.target.checked })) }), h('span', {})),
         h('b', { class: 'grow' }, w.name),
         w.lastRun ? h('small', { title: w.lastRun.error || '' }, w.lastRun.ok ? '✅' : '❌') : null,
       ),
       h('ol', { class: 'fc-sentence small' }, ...sentence.map((x) => h('li', {}, h('span', {}, x.emoji), ' ', x.text))),
       h('div', { class: 'fc-row wrap' },
-        h('button', { class: 'fc-btn small', onclick: () => guard(() => api.wf.run(w.id, 'sim')).then((r) => r && toast(r.ok ? '🧪 Essai réussi (données d’exemple)' : `❌ ${r.error}`, r.ok ? 'ok' : 'error')) }, '🧪 Essayer'),
-        !guest ? h('button', { class: 'fc-btn small', title: 'Lancer maintenant pour de vrai', onclick: () => guard(() => api.wf.run(w.id, 'real')).then((r) => r && toast(r.ok ? '✅ Fait pour de vrai !' : `❌ ${r.error}`, r.ok ? 'ok' : 'error')) }, '▶ Lancer maintenant') : null,
-        h('button', { class: 'fc-btn small', onclick: () => startLinking({ workflowId: w.id }) }, isLinear(w) ? '✏️ Modifier' : '✏️ Modifier (avancé)'),
-        h('button', { class: 'fc-icon-btn tiny', title: 'Supprimer', onclick: async () => (await confirmBox(`Supprimer « ${w.name} » ?`, { ok: 'Supprimer', danger: true })) && guard(() => api.city.act({ type: 'workflow.delete', id: w.id })) }, '🗑️'),
+        !perms().run ? null : h('button', { class: 'fc-btn small', onclick: () => guard(() => api.wf.run(w.id, 'sim')).then((r) => r && toast(r.ok ? '🧪 Essai réussi (données d’exemple)' : `❌ ${r.error}`, r.ok ? 'ok' : 'error')) }, '🧪 Essayer'),
+        !guest && perms().run ? h('button', { class: 'fc-btn small', title: 'Lancer maintenant pour de vrai', onclick: () => guard(() => api.wf.run(w.id, 'real')).then((r) => r && toast(r.ok ? '✅ Fait pour de vrai !' : `❌ ${r.error}`, r.ok ? 'ok' : 'error')) }, '▶ Lancer maintenant') : null,
+        perms().automate ? h('button', { class: 'fc-btn small', onclick: () => startLinking({ workflowId: w.id }) }, isLinear(w) ? '✏️ Modifier' : '✏️ Modifier (avancé)') : null,
+        !perms().automate ? null : h('button', { class: 'fc-icon-btn tiny', title: 'Supprimer', onclick: async () => (await confirmBox(`Supprimer « ${w.name} » ?`, { ok: 'Supprimer', danger: true })) && guard(() => api.city.act({ type: 'workflow.delete', id: w.id })) }, '🗑️'),
       ),
     );
   });
   return [
     h('header', { class: 'fc-panel-head' }, h('span', { class: 'em' }, '📋'), h('div', { class: 'grow' }, h('b', { class: 'fc-panel-title' }, 'Mes automatisations'), h('small', {}, `${c.workflows.filter((w) => w.enabled).length} en marche`)), h('button', { class: 'fc-icon-btn', onclick: () => ((state.view = null), renderSelected()) }, '✕')),
     h('div', { class: 'fc-panel-body' },
-      h('button', { class: 'fc-btn primary block', onclick: () => startLinking() }, '🔗 Créer une automatisation (relier des bâtiments)'),
+      perms().automate ? h('button', { class: 'fc-btn primary block', onclick: () => startLinking() }, '🔗 Créer une automatisation (relier des bâtiments)') : h('p', { class: 'fc-muted small' }, `Ton rôle (${roleOf(c, me())?.name}) permet de voir${perms().run ? ' et de lancer' : ''} les automatisations, pas de les modifier.`),
       c.workflows.length ? null : h('div', { class: 'fc-tip' }, h('b', {}, 'Comment ça marche ?'), h('p', {}, 'Une automatisation, c’est « quand il se passe ceci, fais cela ». Clique sur « Relier des bâtiments », puis sur le bâtiment du départ (ex. la Poste : « quand je reçois un mail »), puis sur celui qui agit (ex. la Tour radio : « préviens-moi sur mon téléphone »). C’est tout !')),
       ...list,
       h('details', { class: 'fc-adv' }, h('summary', {}, '🧩 Mode avancé (schéma)'), h('p', { class: 'fc-muted small' }, 'Pour les curieux : un éditeur en schéma, avec aiguillages oui/non, formules et API. Facultatif.'), h('button', { class: 'fc-btn small', onclick: () => openEditor() }, 'Ouvrir l’éditeur avancé')),

@@ -99,3 +99,33 @@ test('mode simple : étiquettes lisibles et phrases', async () => {
   assert.match(s[1].text, /^Mairie affiche un message/);
   assert.ok(isLinear(w));
 });
+
+test('habitants et rôles', () => {
+  const c = newCity({ email: 'ada@x.fr', name: 'Ada' });
+  const ada = 'ada@x.fr';
+  applyAction(c, { type: 'place', building: 'mairie', x: 5, z: 5 }, ada);
+  applyAction(c, { type: 'people.add', email: 'Bob@X.fr', name: 'Bob', roleId: 'gestionnaire' }, ada);
+  applyAction(c, { type: 'people.add', email: 'cleo@x.fr', name: 'Cléo' }, ada);
+  // Membre : pas le droit de construire, mais peut gérer les tâches
+  assert.throws(() => applyAction(c, { type: 'place', building: 'ecole', x: 20, z: 20 }, 'cleo@x.fr'), /Membre/);
+  applyAction(c, { type: 'task.add', title: 'Arroser' }, 'cleo@x.fr');
+  // Gestionnaire : construit, ajoute des membres, mais ne crée pas de rôle ni ne nomme un créateur
+  applyAction(c, { type: 'place', building: 'ecole', x: 20, z: 20 }, 'bob@x.fr');
+  applyAction(c, { type: 'people.add', email: 'dan@x.fr' }, 'bob@x.fr');
+  assert.throws(() => applyAction(c, { type: 'role.save', role: { name: 'Stagiaire', perms: { tasks: true } } }, 'bob@x.fr'), /ne permet pas/);
+  assert.throws(() => applyAction(c, { type: 'people.update', email: 'ada@x.fr', roleId: 'membre' }, 'bob@x.fr'), /créateur/i);
+  // Inconnu : rien
+  assert.throws(() => applyAction(c, { type: 'task.add', title: 'x' }, 'zed@x.fr'), /fais pas partie/);
+  // Rôle sur mesure créé par le créateur
+  const { info: role } = applyAction(c, { type: 'role.save', role: { name: 'Assistant', emoji: '🤝', perms: { automate: true, run: true } } }, ada);
+  applyAction(c, { type: 'people.update', email: 'dan@x.fr', roleId: role.id }, ada);
+  applyAction(c, { type: 'workflow.save', workflow: { id: 'w1', name: 'x', nodes: [], edges: [] } }, 'dan@x.fr');
+  assert.throws(() => applyAction(c, { type: 'roads', add: [[1, 1]] }, 'dan@x.fr'), /Assistant/);
+  // Un gestionnaire ne peut pas donner un rôle plus puissant que le sien
+  applyAction(c, { type: 'role.save', role: { name: 'Admin', perms: { roles: true, people: true } } }, ada);
+  const admin = c.roles.find((r) => r.name === 'Admin');
+  assert.throws(() => applyAction(c, { type: 'people.update', email: 'cleo@x.fr', roleId: admin.id }, 'bob@x.fr'), /droits que tu n’as pas/);
+  applyAction(c, { type: 'role.delete', id: role.id }, ada);
+  assert.equal(c.people.find((p) => p.email === 'dan@x.fr').roleId, 'membre');
+  assert.throws(() => applyAction(c, { type: 'people.remove', email: 'ada@x.fr' }, ada), /créateur/);
+});

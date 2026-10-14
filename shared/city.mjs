@@ -6,13 +6,14 @@ import { MISSIONS } from './missions.mjs';
 import { uid, createsCycle } from './engine.mjs';
 import { opDef, defaultParams } from './services.mjs';
 import { TEMPLATES } from './library.mjs';
+import { ensurePeople, applyPeopleAction, ACTION_PERM, can, roleOf, PERMS } from './people.mjs';
 
 export const GRID = 48;
 export const START_CREDITS = 1500;
 export const CITY_VERSION = 1;
 
 export function newCity(owner = {}) {
-  return {
+  return ensurePeople({
     version: CITY_VERSION,
     name: owner.name ? `${owner.name.split(' ')[0]}ville` : 'Ma ville',
     owner: { email: owner.email || '', name: owner.name || '', picture: owner.picture || null },
@@ -34,7 +35,9 @@ export function newCity(owner = {}) {
     flags: {},
     connections: [],
     lastTaxes: null,
-  };
+    roles: null,
+    people: null,
+  });
 }
 
 export function migrateCity(c) {
@@ -42,7 +45,7 @@ export function migrateCity(c) {
   const out = { ...base, ...(c || {}) };
   for (const k of ['buildings', 'roads', 'workflows', 'blueprints', 'tasks', 'journal', 'ledger', 'runs', 'connections']) if (!Array.isArray(out[k])) out[k] = [];
   for (const k of ['missions', 'flags']) if (!out[k] || typeof out[k] !== 'object') out[k] = {};
-  return out;
+  return ensurePeople(out);
 }
 
 // ---------- Géométrie de la grille ----------
@@ -309,8 +312,19 @@ export function workflowFromTemplate(t) {
 }
 
 // ---------- Actions ----------
-export function applyAction(city, action) {
+// `actor` = e-mail de la personne qui agit (absent = la ville elle-même : horloge, exécutions…)
+export function applyAction(city, action, actor) {
   const a = action || {};
+  ensurePeople(city);
+  const need = ACTION_PERM[a.type];
+  if (actor !== undefined && need && !can(city, actor, need)) {
+    const role = roleOf(city, actor);
+    throw new Error(role ? `Ton rôle (${role.emoji} ${role.name}) ne permet pas de : ${PERMS.find((p) => p.id === need).label.toLowerCase()}.` : 'Tu ne fais pas partie de cette ville.');
+  }
+  if (/^(people|role)\./.test(a.type)) {
+    const info = applyPeopleAction(city, a, actor, (t) => log(city, t, 'people'));
+    return { city, info };
+  }
   const result = { city, info: null };
   const findB = (id) => {
     const b = city.buildings.find((x) => x.id === id);
@@ -548,7 +562,8 @@ export function applyAction(city, action) {
       log(city, a.text, a.kind || 'info');
       break;
     case 'reset': {
-      const fresh = newCity(city.owner);
+      const keep = { roles: city.roles, people: city.people };
+      const fresh = Object.assign(newCity(city.owner), keep);
       Object.keys(city).forEach((k) => delete city[k]);
       Object.assign(city, fresh);
       break;

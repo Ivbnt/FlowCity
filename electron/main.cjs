@@ -25,19 +25,41 @@ let user = null; // { email, name, picture, guest }
 function session() {
   return user ? { ...user, google: !user.guest && google.isConnected(user.email) } : null;
 }
+function requirePerm(perm) {
+  const c = getCity();
+  if (!S.people.can(c, user.email, perm)) {
+    const r = S.people.roleOf(c, user.email);
+    throw new Error(`Ton rôle (${r ? `${r.emoji} ${r.name}` : 'aucun'}) ne permet pas de : ${S.people.PERMS.find((p) => p.id === perm).label.toLowerCase()}.`);
+  }
+}
 function requireUser() {
   if (!user) throw new Error('Connecte-toi d’abord.');
   return user;
 }
 
 // ---------- Ville ----------
+// Chaque ville est rangée sous l'e-mail de son créateur. On peut faire partie de plusieurs villes
+// (la sienne + celles où l'on a été ajouté) : `user.city` est la ville ouverte.
 function cityKey() {
-  return requireUser().email;
+  const u = requireUser();
+  return u.city || u.email;
+}
+const norm = (e) => String(e || '').trim().toLowerCase();
+function myCities() {
+  const cities = store.get('cities') || {};
+  const me = norm(requireUser().email);
+  return Object.entries(cities)
+    .filter(([k, c]) => k === me || (c.people || []).some((p) => norm(p.email) === me))
+    .map(([k, c]) => ({ key: k, name: c.name, owner: c.owner?.name || k, mine: k === me, role: S.people.roleOf(S.city.migrateCity(structuredClone(c)), me)?.name || '' }));
 }
 function getCity() {
   const cities = store.get('cities') || {};
   const k = cityKey();
   if (!cities[k]) {
+    if (k !== user.email) {
+      user.city = user.email; // la ville partagée a disparu : retour chez soi
+      return getCity();
+    }
     cities[k] = S.city.newCity(user);
     store.set('cities', cities);
   }
@@ -52,16 +74,25 @@ function saveCity(c) {
   send('city:changed', c);
   return c;
 }
-function act(action) {
+// actor : la personne connectée (ses droits sont vérifiés) ; system: true pour la ville elle-même
+// (une automatisation qui ajoute une tâche, le journal…).
+function act(action, { system = false } = {}) {
   const c = getCity();
   const before = Object.keys(c.missions).length;
-  const { info } = S.city.applyAction(c, action);
+  const { info } = S.city.applyAction(c, action, system ? undefined : user.email);
   saveCity(c);
   if (Object.keys(c.missions).length > before) send('missions:done', Object.keys(c.missions).slice(before));
   return { city: c, info };
 }
 
 // ---------- Connexions (Centrale électrique) ----------
+// Compte Google utilisé par la ville : celui du créateur s'il est connecté sur cet ordinateur,
+// sinon celui de la personne connectée.
+function googleEmail() {
+  const owner = cityKey();
+  if (google.isConnected(owner)) return owner;
+  return user && !user.guest && google.isConnected(user.email) ? user.email : null;
+}
 const credName = (service) => `${cityKey()}:cred:${service}`;
 function cred(service) {
   return store.getSecretJson(credName(service));
@@ -69,8 +100,8 @@ function cred(service) {
 function connections() {
   if (!user) return [];
   const out = [];
-  if (!user.guest && google.isConnected(user.email)) out.push('google');
-  for (const n of store.secretNames(`${user.email}:cred:`)) out.push(n.split(':cred:')[1]);
+  if (!user.guest && googleEmail()) out.push('google');
+  for (const n of store.secretNames(`${cityKey()}:cred:`)) out.push(n.split(':cred:')[1]);
   return out;
 }
 function syncConnections() {
@@ -106,15 +137,15 @@ const pendingApprovals = new Map();
 const running = new Map(); // workflowId → signal
 function adapterFor(mode, run) {
   const conn = createConnectors({
-    email: user.email,
+    email: googleEmail() || user.email,
     model: store.get('settings').model,
     cred,
     notify: (title, text) => {
       send('toast', { kind: 'ok', text: `🔔 ${title} — ${text}` });
       if (Notification.isSupported()) new Notification({ title, body: String(text).slice(0, 300) }).show();
     },
-    addTask: (fields) => act({ type: 'task.add', ...fields, source: run.name }).info,
-    journal: (text) => act({ type: 'journal', text }),
+    addTask: (fields) => act({ type: 'task.add', ...fields, source: run.name }, { system: true }).info,
+    journal: (text) => act({ type: 'journal', text }, { system: true }),
     runSubflow: async (id, item, depth) => {
       if (depth > 3) throw new Error('Trop de workflows imbriqués (3 maximum).');
       const sub = getCity().workflows.find((w) => w.id === id);
@@ -214,7 +245,7 @@ async function tick() {
         } else if (POLL_MINUTES[trig.op]) {
           if (wf.mode !== 'real') continue; // en simulation, pas d'interrogation des vrais comptes
           if (cur?.at && Date.now() - new Date(cur.at).getTime() < POLL_MINUTES[trig.op] * 60000) continue;
-          const conn = createConnectors({ email: user.email, cred, notify() {}, addTask() {}, journal() {}, runSubflow() {}, openExternal() {} });
+          const conn = createConnectors({ email: googleEmail() || user.email, cred, notify() {}, addTask() {}, journal() {}, runSubflow() {}, openExternal() {} });
           const { items, cursor } = await conn.poll(trig, cur?.state || null);
           setCursor(wf.id, { at: new Date().toISOString(), state: cursor });
           if (items.length) execute(wf, { source: 'automatique', triggerItems: items }).catch((e) => send('toast', { kind: 'error', text: `${wf.name} : ${e.message}` }));
@@ -283,6 +314,7 @@ function status() {
   const s = store.get('settings');
   return {
     session: session(),
+    city: user ? cityKey() : null,
     googleClientId: s.googleClientId,
     googleHasSecret: store.hasSecret('googleClientSecret'),
     model: s.model,
@@ -294,11 +326,17 @@ function status() {
   };
 }
 function login(profile) {
-  user = profile;
-  store.set('lastUser', { email: profile.email, name: profile.name, picture: profile.picture, guest: Boolean(profile.guest) });
+  user = { ...profile, city: profile.email };
+  const last = store.get('lastUser');
+  if (last?.email === profile.email && last.city && myCities().some((c) => c.key === last.city)) user.city = last.city;
+  rememberUser();
   syncConnections();
   send('session:changed', status());
   return status();
+}
+
+function rememberUser() {
+  store.set('lastUser', { email: user.email, name: user.name, picture: user.picture, guest: Boolean(user.guest), city: user.city });
 }
 
 function registerIpc() {
@@ -325,8 +363,18 @@ function registerIpc() {
     return status();
   });
   h('city:get', () => getCity());
+  h('city:list', () => myCities());
+  h('city:switch', (key) => {
+    if (!myCities().some((c) => c.key === key)) throw new Error('Tu ne fais pas partie de cette ville.');
+    user.city = key;
+    rememberUser();
+    syncConnections();
+    send('session:changed', status());
+    return getCity();
+  });
   h('city:act', (action) => act(action));
   h('city:export', async () => {
+    requirePerm('settings');
     const r = await dialog.showSaveDialog(win, { title: 'Sauvegarder ma ville', defaultPath: `${getCity().name}.flowcity.json`, filters: [{ name: 'Ville Flowcity', extensions: ['json'] }] });
     if (r.canceled) return false;
     const c = getCity();
@@ -337,11 +385,24 @@ function registerIpc() {
     const r = await dialog.showOpenDialog(win, { title: 'Ouvrir une ville', filters: [{ name: 'Ville Flowcity', extensions: ['json'] }], properties: ['openFile'] });
     if (r.canceled || !r.filePaths[0]) return null;
     const raw = JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8'));
-    const c = S.city.migrateCity({ ...raw, owner: getCity().owner, connections: connections() });
+    // Une ville partagée par fichier garde son créateur et ses habitants : on l'ouvre si on en fait partie.
+    const c = S.city.migrateCity(raw);
+    const key = norm(c.owner?.email) || user.email;
+    if (!S.people.roleOf(c, user.email)) throw new Error('Tu ne fais pas partie de cette ville : demande à son créateur de t’ajouter (Habitants), puis de te renvoyer le fichier.');
+    const cities = store.get('cities') || {};
+    if (cities[key] && !S.people.can(S.city.migrateCity(cities[key]), user.email, 'settings')) throw new Error('Cette ville existe déjà sur cet ordinateur et ton rôle ne permet pas de la remplacer.');
     for (const w of c.workflows) w.enabled = false; // par prudence : on réactive à la main
-    return saveCity(c);
+    c.connections = [];
+    cities[key] = c;
+    store.set('cities', cities);
+    user.city = key;
+    rememberUser();
+    syncConnections();
+    send('session:changed', status());
+    return getCity();
   });
   h('cred:save', async (service, values) => {
+    requirePerm('connect');
     const svc = S.services.SERVICES[service];
     if (!svc || svc.auth.kind !== 'fields') throw new Error('Service inconnu');
     const prev = cred(service) || {};
@@ -358,9 +419,10 @@ function registerIpc() {
   h('cred:test', async (service) => {
     const c = service === 'google' ? {} : cred(service);
     if (service !== 'google' && !c) throw new Error('Rien à tester : enregistre d’abord les informations.');
-    return testService(service, c, { email: requireUser().email });
+    return testService(service, c, { email: googleEmail() || requireUser().email });
   });
   h('cred:remove', (service) => {
+    requirePerm('connect');
     store.setSecret(credName(service), null);
     syncConnections();
     return status();
@@ -368,6 +430,7 @@ function registerIpc() {
   h('wf:run', async (id, mode) => {
     const wf = getCity().workflows.find((w) => w.id === id);
     if (!wf) throw new Error('Workflow introuvable');
+    requirePerm('run');
     if (mode === 'real' && user.guest) throw new Error('Le mode réel demande un compte Google : en visite, tout se fait en simulation.');
     return execute(wf, { mode: mode || wf.mode, source: 'manuel' });
   });
@@ -401,7 +464,7 @@ function registerIpc() {
     return status();
   });
   h('open:url', (url) => {
-    if (/^https:\/\//.test(String(url))) shell.openExternal(String(url));
+    if (/^(https:\/\/|mailto:)/.test(String(url))) shell.openExternal(String(url));
   });
 }
 
@@ -441,7 +504,7 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   const imp = (f) => import(pathToFileURL(path.join(__dirname, '..', 'shared', f)).href);
-  S = { services: await imp('services.mjs'), engine: await imp('engine.mjs'), city: await imp('city.mjs'), buildings: await imp('buildings.mjs'), mock: await imp('mock.mjs') };
+  S = { people: await imp('people.mjs'), services: await imp('services.mjs'), engine: await imp('engine.mjs'), city: await imp('city.mjs'), buildings: await imp('buildings.mjs'), mock: await imp('mock.mjs') };
   assistant.init(S);
   store.load();
   // Reprise de la dernière session (le jeton Google reste chiffré sur le PC)

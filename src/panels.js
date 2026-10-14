@@ -22,16 +22,18 @@ export function renderPanel(ctx, building, arg) {
     h('button', { class: 'fc-icon-btn', title: 'Fermer', onclick: () => ctx.select(null) }, '✕'),
   );
   const access = !['deco', 'roads'].includes(def.category) && !hasRoadAccess(c, building) ? h('div', { class: 'fc-alert' }, '🚧 Pas de route devant ce bâtiment : les flux de données le rejoindront en volant. Trace une route qui le touche, ou :', h('button', { class: 'fc-btn small block', onclick: () => guard(() => ctx.api.city.act({ type: 'connect', id: building.id }), 'Bâtiment relié au réseau') }, '🛣️ Relier automatiquement à la route')) : null;
-  const link = ctx.linkable(building) ? h('button', { class: 'fc-btn primary block big', onclick: () => ctx.startLinking({ buildingId: ctx.linkable(building) === 'trigger' ? building.id : undefined }) }, '🔗 Relier ce bâtiment à un autre') : null;
+  const P = ctx.perms();
+  const link = P.automate && ctx.linkable(building) ? h('button', { class: 'fc-btn primary block big', onclick: () => ctx.startLinking({ buildingId: ctx.linkable(building) === 'trigger' ? building.id : undefined }) }, '🔗 Relier ce bâtiment à un autre') : null;
   const body = h('div', { class: 'fc-panel-body' }, h('p', { class: 'fc-role' }, def.role), access, link);
   const fn = PANELS[def.panel] || (def.services ? servicePanel : def.blueprint ? blueprintBuildingPanel : genericPanel);
   body.append(...[].concat(fn(ctx, building, def, arg) || []).filter(Boolean));
-  const foot = h('footer', { class: 'fc-panel-foot' },
+  const foot = !P.build ? null : h('footer', { class: 'fc-panel-foot' },
     h('button', { class: 'fc-btn ghost small', onclick: () => guard(() => ctx.api.city.act({ type: 'move', id: building.id, x: building.x, z: building.z, rot: (building.rot + 1) % 4 })) }, '↻ Pivoter'),
     h('span', { class: 'fc-spacer' }),
     h('button', { class: 'fc-btn danger small', onclick: async () => (await confirmBox(`Démolir ${building.name || def.name} ?`, { ok: 'Démolir', danger: true })) && (await guard(() => ctx.api.city.act({ type: 'remove', id: building.id }))) && ctx.select(null) }, '🧨 Démolir'),
   );
-  return [head, body, foot];
+  if (!P.build) head.querySelector('.fc-panel-name').disabled = true;
+  return [head, body, foot].filter(Boolean);
 }
 
 const section = (title, ...children) => h('section', { class: 'fc-sec' }, h('h3', {}, title), ...children);
@@ -88,6 +90,7 @@ function mairie(ctx) {
   if (!c.sandbox) stats.push(['👥', population(c), 'habitants'], ['😊', `${happiness(c)} %`, 'bonheur']);
   return [
     section('Ta ville', h('div', { class: 'fc-row' }, h('input', { class: 'fc-input', value: c.name, onchange: (e) => guard(() => ctx.api.city.act({ type: 'city.rename', name: e.target.value })) })), h('div', { class: 'fc-stats' }, ...stats.map(([i, v, l]) => h('div', {}, h('span', {}, i), h('b', {}, String(v)), h('small', {}, l))))),
+    section('Habitants', h('div', { class: 'fc-row wrap' }, ...c.people.slice(0, 8).map((p) => h('span', { class: 'fc-role-badge', title: p.email, style: { '--rc': c.roles.find((r) => r.id === p.roleId)?.color } }, `${c.roles.find((r) => r.id === p.roleId)?.emoji || ''} ${p.name}`)), c.people.length > 8 ? h('small', {}, `+${c.people.length - 8}`) : null), h('button', { class: 'fc-btn block', onclick: () => ctx.openPeople() }, '👥 Gérer les habitants et les rôles')),
     section('Tes tâches', add, tasks),
     section('Mode de jeu',
       h('div', { class: 'fc-seg wide' },
@@ -193,6 +196,7 @@ function centrale(ctx, b, def, focusService) {
         ? h('div', {}, h('p', {}, `⚡ Connecté en tant que ${st.session?.email}`), h('div', { class: 'fc-row' }, h('button', { class: 'fc-btn small', onclick: () => guard(() => ctx.api.cred.test('google')).then((m) => m && toast(m, 'ok')) }, 'Tester'), h('button', { class: 'fc-btn small ghost', onclick: async () => (await confirmBox('Déconnecter Google ? Les automatisations qui utilisent Gmail, Drive, Agenda ou Sheets s’arrêteront.', { ok: 'Déconnecter', danger: true })) && guard(() => ctx.api.auth.disconnectGoogle()).then(ctx.refreshStatus) }, 'Déconnecter')))
         : h('div', {}, h('p', { class: 'fc-muted' }, 'Google n’est plus connecté.'), h('button', { class: 'fc-btn primary', onclick: () => guard(() => ctx.api.auth.google()).then(ctx.refreshStatus) }, 'Reconnecter Google')),
   );
+  if (!ctx.perms().connect) out.push(h('p', { class: 'fc-alert' }, '🔒 Ton rôle ne permet pas de brancher ou de changer les comptes. Tu peux voir ce qui est branché.'));
   out.push(h('p', { class: 'fc-muted small' }, st.encrypted ? '🔒 Les clés sont chiffrées sur ton ordinateur et ne quittent jamais ta machine (sauf vers le service concerné).' : st.demo ? 'Aperçu navigateur : les informations restent dans ce navigateur.' : '⚠️ Chiffrement indisponible sur ce système : les clés sont stockées en clair.'), google);
   const entries = Object.entries(SERVICES).filter(([, s]) => s.auth.kind === 'fields');
   entries.sort(([a], [b2]) => Number(built.has(b2)) - Number(built.has(a)) || (a === focusService ? -1 : b2 === focusService ? 1 : 0));
@@ -210,7 +214,7 @@ function centrale(ctx, b, def, focusService) {
           h('p', { class: 'fc-muted small' }, s.auth.help || ''),
           form,
           h('div', { class: 'fc-row' },
-            h('button', { class: 'fc-btn small primary', onclick: async () => {
+            h('button', { class: 'fc-btn small primary', disabled: !ctx.perms().connect, onclick: async () => {
               const values = Object.fromEntries(Object.entries(inputs).map(([k, el]) => [k, el.value]));
               const r = await guard(() => ctx.api.cred.save(id, values), `${s.name} enregistré`);
               if (r) ctx.refreshStatus();

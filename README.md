@@ -27,7 +27,25 @@ Quelques exemples d'usage, selon le profil :
 5. **Mes automatisations** : la liste, avec interrupteur marche/arrêt, Essayer, Lancer maintenant, Modifier. Un **mode avancé** (éditeur en schéma, avec aiguillages et formules) reste disponible pour les curieux, mais il n'est jamais nécessaire.
 6. **Balade** : visite ta ville à pied (ZQSD / WASD, souris, Maj pour courir) et entre dans un bâtiment avec **E**. Touche **V** pour passer de la vue d'ensemble à la balade. Pas d'armes : on se promène.
 
+7. **Habitants** (bouton 👥 en haut, ou la Mairie) : ajoute des personnes à ta ville avec leur adresse Google et donne-leur un rôle.
+
 Le mode **bac à sable** (par défaut) débloque tout gratuitement. Le **mode défi** (à la Mairie) ajoute crédits, niveaux et impôts quotidiens.
+
+## Habitants et rôles
+
+Chaque ville a un **Créateur** (celui qui l'a fondée : tous les droits, pour toujours). On y ajoute des personnes avec un rôle :
+
+| Rôle | Ce qu'il permet (par défaut) |
+|---|---|
+| 👑 **Créateur** | tout |
+| 🧭 **Gestionnaire** | construire, créer et modifier les automatisations, les lancer, brancher des comptes, gérer les tâches, ajouter des personnes |
+| 🙂 **Membre** | visiter, lancer et mettre en marche les automatisations, gérer les tâches |
+
+On crée **d'autres rôles** en deux clics (nom, emoji, couleur) en cochant des droits écrits en français : construire ; créer/modifier des automatisations ; les lancer ; brancher des comptes ; gérer les tâches ; ajouter des personnes ; créer des rôles ; régler la ville. Les droits des rôles Gestionnaire et Membre se modifient aussi.
+
+Règles de sécurité : on ne peut donner que des droits qu'on a soi-même ; personne ne peut retirer ni rétrograder le Créateur ; supprimer un rôle fait redevenir Membres les personnes concernées. Les droits sont vérifiés par l'application elle-même (pas seulement par l'interface).
+
+Pour entrer dans une ville où l'on a été ajouté : se connecter à Flowcity avec son compte Google sur le même ordinateur (le nom de la ville, en haut à gauche, permet de changer de ville), ou ouvrir le fichier de la ville envoyé par son créateur (Mairie → Sauvegarder / Ouvrir une ville). Le partage en direct entre plusieurs ordinateurs demandera un serveur commun : c'est la prochaine étape.
 
 ## Les bâtiments
 
@@ -91,6 +109,7 @@ electron/
 shared/           (utilisé par l'application ET l'aperçu navigateur)
   services.mjs    catalogue des services : déclencheurs, actions, champs
   simple.mjs      mode simple : phrases, étiquettes [Objet], champs simplifiés
+  people.mjs      habitants, rôles et droits
   buildings.mjs   bâtiments, catégories, niveaux
   engine.mjs      moteur d'exécution, variables, conditions, vérifications
   city.mjs        état de la ville et toutes les actions (construction, routes, workflows…)
@@ -103,6 +122,7 @@ src/
   linker.js       « Relier des bâtiments » : création d'automatisations dans la ville
   editor.js       éditeur en schéma (mode avancé, facultatif)
   logo.js         logo Flowcity
+  people.js       panneau Habitants (personnes, rôles, droits)
   panels.js       panneaux des bâtiments
   main.js         interface du jeu
   api.js          accès au processus principal (ou mode navigateur)

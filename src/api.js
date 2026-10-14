@@ -2,6 +2,7 @@
 // (aperçu, démo), le même jeu tourne en local : ville dans le stockage du navigateur,
 // exécutions en simulation uniquement.
 import { applyAction, migrateCity, newCity, recordRun } from '../shared/city.mjs';
+import { roleOf } from '../shared/people.mjs';
 import { runWorkflow, validate } from '../shared/engine.mjs';
 import { mockCall } from '../shared/mock.mjs';
 import { opAvailable } from '../shared/buildings.mjs';
@@ -30,7 +31,20 @@ function browserApi() {
   };
   let user = load('fc.user', null);
   let creds = load('fc.creds', {});
-  const cityKey = () => `fc.city.${user?.email || 'x'}`;
+  // Comme dans l'application : une ville par créateur ; on peut ouvrir celles où l'on a été ajouté.
+  const cityKey = () => `fc.city.${user?.city || user?.email || 'x'}`;
+  const allCities = () => {
+    const out = [];
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k.startsWith('fc.city.')) out.push([k.slice(8), migrateCity(load(k, null))]);
+      }
+    } catch {
+      /* stockage indisponible */
+    }
+    return out;
+  };
   const connections = () => [...(user && !user.guest ? ['google'] : []), ...Object.keys(creds).filter((k) => creds[k])];
   const getCity = () => Object.assign(migrateCity(load(cityKey(), null) || newCity(user || {})), { connections: connections() });
   const putCity = (c) => {
@@ -41,6 +55,7 @@ function browserApi() {
   };
   const status = () => ({
     session: user,
+    city: user?.city || user?.email || null,
     demo: true,
     googleClientId: 'demo',
     webhookBase: 'http://127.0.0.1:47800/hook/',
@@ -50,17 +65,17 @@ function browserApi() {
     claude: false,
   });
   const login = (u) => {
-    user = u;
+    user = { ...u, city: u.email };
     save('fc.user', u);
     const c = getCity();
     putCity(c);
     emit('session:changed', status());
     return status();
   };
-  const act = (action) => {
+  const act = (action, system = false) => {
     const c = getCity();
     const before = Object.keys(c.missions).length;
-    const { info } = applyAction(c, action);
+    const { info } = applyAction(c, action, system ? undefined : user?.email);
     putCity(c);
     if (Object.keys(c.missions).length > before) emit('missions:done', Object.keys(c.missions).slice(before));
     return { city: c, info };
@@ -80,8 +95,8 @@ function browserApi() {
       call: async (op, params, item) => {
         await new Promise((r) => setTimeout(r, 350 + Math.random() * 350));
         if (op === 'flow.notify') emit('toast', { kind: 'ok', text: `🔔 ${params.title || 'Flowcity'} — ${params.text || ''}` });
-        if (op === 'flow.task') act({ type: 'task.add', title: params.title, priority: Number(params.priority) || 2, due: params.due || null, source: wf.name });
-        if (op === 'flow.note') act({ type: 'journal', text: `📝 ${params.text}` });
+        if (op === 'flow.task') act({ type: 'task.add', title: params.title, priority: Number(params.priority) || 2, due: params.due || null, source: wf.name }, true);
+        if (op === 'flow.note') act({ type: 'journal', text: `📝 ${params.text}` }, true);
         if (op === 'flow.subflow') {
           const sub = getCity().workflows.find((w) => w.id === params.workflowId);
           if (!sub) throw new Error('Workflow lancé introuvable');
@@ -136,6 +151,15 @@ function browserApi() {
     },
     city: {
       get: async () => getCity(),
+      list: async () => {
+        getCity();
+        return allCities().filter(([k, c]) => k === user.email || roleOf(c, user.email)).map(([k, c]) => ({ key: k, name: c.name, owner: c.owner?.name || k, mine: k === user.email, role: roleOf(c, user.email)?.name || '' }));
+      },
+      switch: async (key) => {
+        user = { ...user, city: key };
+        save('fc.user', user);
+        return getCity();
+      },
       act: async (a) => act(a),
       export: async () => {
         const blob = new Blob([JSON.stringify(getCity(), null, 2)], { type: 'application/json' });
@@ -153,7 +177,7 @@ function browserApi() {
       save: async (service, values) => {
         creds = { ...creds, [service]: values };
         save('fc.creds', creds);
-        act({ type: 'flag', key: 'credSaved' }); // revérifie les missions avec la nouvelle connexion
+        act({ type: 'flag', key: 'credSaved' }, true); // revérifie les missions avec la nouvelle connexion
         return status();
       },
       test: async (service) => (service === 'google' ? 'Aperçu : Google simulé' : 'Aperçu navigateur : enregistré (le test réel se fait dans l’application)'),
