@@ -3,90 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; frame-src https://open.spotify.com" />
-    <title>Map TRS</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'" />
+    <title>FlowCity</title>
+    <link rel="icon" href="data:," />
   </head>
   <body>
     <div id="app">
-      <main id="stage"></main>
-      <div class="vignette"></div>
-
-      <header id="topbar">
-        <div class="brand" title="THE RED STUDIO">
-          <div class="logo">TRS</div>
-          <div class="brand-text"><b>Map</b> <span id="root-name">THE RED STUDIO</span></div>
-        </div>
-        <div class="search">
-          <span class="search-ico" id="search-ico"></span>
-          <input id="search" type="search" placeholder="Rechercher…" autocomplete="off" />
-          <kbd>Ctrl K</kbd>
-          <div id="search-results" class="search-results"></div>
-        </div>
-        <div class="top-right">
-          <div class="pill seg-pill" id="nav-chip"></div>
-          <button class="pill hidden" id="lock-chip"></button>
-          <button class="pill" id="links-chip"></button>
-          <div id="links-menu" class="sheet hidden"></div>
-          <button class="pill" id="view-chip"></button>
-          <div id="view-menu" class="sheet hidden"></div>
-          <button class="pill" id="sky-chip"></button>
-          <button class="pill" id="sync-chip"></button>
-          <button class="pill me hidden" id="me-chip"></button>
-          <div id="me-menu" class="sheet hidden"></div>
-        </div>
-      </header>
-
-      <nav id="rail">
-        <button data-drawer="city" title="La ville"></button>
-        <button data-drawer="tasks" title="Toutes les tâches"></button>
-        <button data-drawer="roadmap" title="Feuille de route & BP"></button>
-        <button data-drawer="agents" title="Agents & automatisations"></button>
-        <span class="rail-spacer"></span>
-        <button data-drawer="settings" title="Réglages & intégrations"></button>
-      </nav>
-
-      <aside id="drawer" class="sheet hidden"></aside>
-      <aside id="panel" class="sheet hidden"></aside>
-
-      <button id="claude-fab" title="Parler à Claude">
-        <span class="fab-orb"></span>
-        <span class="fab-status" id="fab-status"></span>
-      </button>
-      <section id="chat" class="sheet hidden">
-        <header class="chat-head">
-          <span class="fab-orb small"></span>
-          <div><b>Claude</b><small id="chat-status">prêt</small></div>
-          <span class="spacer"></span>
-          <button class="icon-btn" id="chat-reset" title="Nouvelle conversation"></button>
-          <button class="icon-btn" id="chat-close" title="Fermer"></button>
-        </header>
-        <div id="chat-log"></div>
-        <div class="chat-suggest" id="chat-suggest"></div>
-        <form id="chat-form">
-          <div id="chat-focus" class="focus-chip hidden"></div>
-          <div class="chat-input">
-            <textarea id="chat-input" rows="1" placeholder="Demande quelque chose à Claude…"></textarea>
-            <button type="submit" class="send" id="chat-send" title="Envoyer"></button>
-          </div>
-        </form>
-      </section>
-
-      <section id="radio-dock" class="hidden">
-        <header>
-          <span class="rd-ico"></span>
-          <button class="rd-title" title="Ouvrir la radio"><b>RADIO</b><span class="rd-name"></span></button>
-          <button class="icon-btn tiny rd-app" title="Ouvrir dans l’appli Spotify"></button>
-          <button class="icon-btn tiny rd-close" title="Couper la radio"></button>
-        </header>
-        <iframe title="Lecteur Spotify" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
-      </section>
-      <div id="hint">Clic : ouvrir une maison · Double-clic : ouvrir le fichier · Molette : zoom</div>
-      <div id="hud" class="hidden"></div>
-      <div id="break" class="hidden"><div class="br-card"><div class="br-ico">🌿</div><h2>Pause joint obligatoire</h2><p>Tu utilises la ville depuis 2 heures : 5 minutes de pause. Lève-toi, bois de l’eau, respire un coup.</p><div class="br-time">5:00</div></div></div>
-      <div id="login" class="hidden"><div class="login-card sheet"></div></div>
-      <div id="approval" class="modal hidden"><div class="modal-card sheet"></div></div>
-      <div id="toasts"></div>
-      <div id="loading"><div class="loader-logo">TRS</div><div>Construction de la ville…</div></div>
+      <main id="fc-stage"></main>
+      <div id="fc-toasts"></div>
+      <div id="fc-loading"><div class="fc-logo big"><span>🏙️</span></div><div>Préparation du terrain…</div></div>
     </div>
     <script type="module" src="./main.js"></script>
   </body>

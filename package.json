@@ -1,21 +1,25 @@
 {
-  "name": "map-trs",
-  "productName": "Map TRS",
-  "version": "0.1.0",
-  "description": "Ville 3D du Drive THE RED STUDIO : projets, tâches, agents Claude et automatisations n8n.",
-  "author": "THE RED STUDIO",
+  "name": "flowcity",
+  "productName": "FlowCity",
+  "version": "1.0.0",
+  "description": "FlowCity : construis ta ville, automatise ta vie. Un bac à sable façon SimCity pour apprendre et créer des workflows (Gmail, Drive, Slack, Notion, IA…).",
+  "author": "FlowCity",
   "license": "UNLICENSED",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
     "build": "vite build",
+    "preview": "vite build && vite preview --port 4173",
     "start": "node scripts/launch.cjs",
     "dist:win": "npm run build && npx --yes electron-builder@25.1.8 --win nsis portable",
-    "check": "node --check electron/main.cjs && node --check electron/preload.cjs && node --check electron/store.cjs && node --check electron/google.cjs && node --check electron/claude.cjs && node --check electron/n8n.cjs && node --check electron/office.cjs && node --check electron/accounts.cjs && node --check scripts/launch.cjs && node --check electron/news.cjs && node --check electron/accounts.cjs && node --check electron/spotify.cjs && vite build"
+    "dist:mac": "npm run build && npx --yes electron-builder@25.1.8 --mac dmg",
+    "dist:linux": "npm run build && npx --yes electron-builder@25.1.8 --linux AppImage",
+    "test": "node --test \"tests/*.test.mjs\"",
+    "check": "node --check electron/main.cjs && node --check electron/preload.cjs && node --check electron/store.cjs && node --check electron/google.cjs && node --check electron/connectors.cjs && node --check electron/assistant.cjs && node --check scripts/launch.cjs && node --test \"tests/*.test.mjs\" && vite build"
   },
   "build": {
-    "appId": "studio.thered.maptrs",
-    "productName": "Map TRS",
+    "appId": "app.flowcity",
+    "productName": "FlowCity",
     "directories": {
       "output": "release"
     },
@@ -36,10 +40,27 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "Map TRS"
+      "shortcutName": "FlowCity"
     },
     "portable": {
-      "artifactName": "MapTRS-portable-${version}.exe"
+      "artifactName": "FlowCity-portable-${version}.exe"
+    },
+    "extraFiles": [
+      {
+        "from": ".",
+        "to": ".",
+        "filter": [
+          "flowcity.config.json"
+        ]
+      }
+    ],
+    "mac": {
+      "icon": "build/icon.png",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Utility"
     }
   },
   "dependencies": {

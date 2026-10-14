@@ -1,4 +1,4 @@
-// Lanceur rapide de Map TRS (appelé par « Lancer Map TRS.bat » et « npm start »).
+// Lanceur rapide de FlowCity (appelé par « Lancer FlowCity.bat » et « npm start »).
 // - installe les composants seulement la première fois, ou quand package-lock.json a changé (npm ci, plus rapide) ;
 // - vérifie que le moteur Electron est bien téléchargé (serveur miroir en secours) ;
 // - ne reconstruit l'interface que si le code a changé depuis la dernière fois ;
@@ -10,7 +10,7 @@ const { spawnSync, spawn } = require('child_process');
 
 const root = path.join(__dirname, '..');
 const nm = path.join(root, 'node_modules');
-const marker = path.join(nm, '.map-trs-installe');
+const marker = path.join(nm, '.flowcity-installe');
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const say = (s = '') => console.log(`  ${s}`);
 // Le shell n'est utilisé que pour npm (npm.cmd sous Windows) : les chemins avec espaces
@@ -80,7 +80,7 @@ if (!fs.existsSync(built) || fs.statSync(built).mtimeMs < srcTime) {
 }
 
 // 4. Lancement : l'appli vit sa vie, la fenêtre noire peut se fermer
-say('Lancement de Map TRS…');
+say('Lancement de FlowCity…');
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 const child = spawn(electronPath(), [root], { cwd: root, detached: true, stdio: 'ignore', env });
@@ -88,7 +88,7 @@ let exited = false;
 child.on('exit', (code) => {
   exited = true;
   if (code) {
-    say(`Map TRS s'est arrêté avec une erreur (code ${code}).`);
+    say(`FlowCity s'est arrêté avec une erreur (code ${code}).`);
     process.exit(code);
   }
 });

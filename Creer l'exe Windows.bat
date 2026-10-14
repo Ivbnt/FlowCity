@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title Map TRS - fabrication de l'exe
+title FlowCity - fabrication de l'exe
 cd /d "%~dp0"
 where node >nul 2>nul
 if errorlevel 1 (
@@ -9,7 +9,7 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-if not exist "node_modules\.map-trs-installe" (
+if not exist "node_modules\.flowcity-installe" (
   call npm ci --no-audit --no-fund --loglevel=error || call npm install --no-audit --no-fund --loglevel=error
   if errorlevel 1 ( echo  L'installation a echoue. & pause & exit /b 1 )
 )
@@ -18,7 +18,7 @@ call npm run dist:win
 if errorlevel 1 ( echo  La fabrication a echoue. & pause & exit /b 1 )
 echo.
 echo  Termine ! Les .exe sont dans le dossier "release" :
-echo   - "Map TRS Setup ...exe"  = installeur (raccourci sur le bureau)
-echo   - "MapTRS-portable-...exe" = version portable, sans installation
+echo   - "FlowCity Setup ...exe"     = installeur (raccourci sur le bureau)
+echo   - "FlowCity-portable-...exe"  = version portable, sans installation
 start "" "%~dp0release"
 pause
