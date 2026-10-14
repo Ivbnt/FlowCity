@@ -18,7 +18,7 @@ Quelques exemples d'usage, selon le profil :
 
 1. **Connexion Google** : donne d'emblée accès à Gmail, Drive, Agenda et Sheets (sans jamais partager ton mot de passe). Tu peux aussi « visiter sans compte » : tout se fait alors en simulation.
 2. **Carte vide** : choisis (si tu veux) ce qui t'intéresse — mails, emploi, RH, informatique, réseaux, vie perso — et les bâtiments utiles sont marqués d'une ★. Puis construis : la Mairie d'abord, puis ce que tu veux.
-3. **Construire** (barre du bas) : bâtiments classés par usage — Essentiels, Communication, Fichiers & organisation, Tri & intelligence, Web & réseaux, Vie réelle, Sécurité & suivi, Sur mesure, Décor. Clique, pose sur la carte (R pour pivoter), trace des routes en clic-glissé, démolis avec le bulldozer.
+3. **Construire** (barre du bas) : bâtiments classés par usage — Essentiels, Communication, Fichiers & organisation, Tri & intelligence, Web & réseaux, Vie réelle, Sécurité & suivi, Sur mesure, Décor. Clique, pose sur la carte (R pour pivoter), trace des routes en clic-glissé, démolis avec le bulldozer. Un bâtiment construit peut être **déplacé** (✋ dans son panneau) sans perdre ses réglages. Touche **?** : tous les raccourcis.
 4. **Relier des bâtiments** (bouton en haut) : c'est comme ça qu'on crée une automatisation, sans schéma ni jargon.
    - clique sur le bâtiment qui donne le **départ** (il brille) : la Poste → « quand je reçois un mail », la Mairie → « quand c'est l'heure »… ;
    - clique sur le bâtiment qui doit **agir** : la Tour radio → « m'envoie une notification sur mon téléphone », les Archives → « enregistre le fichier »… ;
@@ -106,7 +106,7 @@ Les autres services se branchent à la **Centrale électrique**, avec l'aide pas
 - Une **automatisation** (un « workflow ») est une suite d'étapes. Le déclencheur produit des *éléments* (un mail, une ligne, un fichier…) ; chaque étape les traite un par un, et ses résultats s'ajoutent à l'élément : après « Demander à Claude », tu peux utiliser à la fois `[Objet]` (du mail) et `[Réponse de l’IA]`.
 - Les déclencheurs « nouveau mail », « nouveau fichier », « événement qui approche », « nouvel article » vérifient régulièrement s'il y a du nouveau (5 à 30 minutes) et ne traitent jamais deux fois le même élément.
 - La **Gare** écoute sur `http://127.0.0.1:47800/hook/<nom>` : un formulaire ou un autre outil de ton ordinateur peut démarrer une automatisation.
-- Les automatisations tournent quand Flowcity est ouvert.
+- Les automatisations tournent tant que Flowcity est ouvert. Fermer la fenêtre ne l'arrête pas : Flowcity continue **en arrière-plan** (icône près de l'horloge → Ouvrir / Quitter), et peut **se lancer au démarrage de l'ordinateur** (Mairie → Fonctionnement).
 
 ## Architecture
 

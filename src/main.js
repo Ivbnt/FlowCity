@@ -105,7 +105,7 @@ async function start() {
     h('div', { id: 'fc-pov', class: 'hidden' }, h('div', { class: 'cross' }), h('div', { class: 'hint' })),
   );
   state.world = new World($('#fc-stage'), {
-    canPlace: (x, z, rot) => state.tool.kind === 'build' && canPlace(city(), state.tool.type, x, z, rot).ok,
+    canPlace: (x, z, rot) => state.tool.kind === 'build' && canPlace(city(), state.tool.type, x, z, rot, state.tool.moveId).ok,
     onPlace: (p) => place(p),
     onRoads: (r) => guard(() => api.city.act({ type: 'roads', ...r })).then((res) => res && res.info.added === 0 && r.add && toast('Ces cases sont déjà occupées.', 'warn')),
     onBulldoze: (id) => {
@@ -152,6 +152,12 @@ async function start() {
   api.wf.onStep((s) => animateStep(s));
   api.wf.onEnd((e) => state.runs.delete(e.runId));
   api.approval.onRequest((req) => askApproval(req));
+  // La Gare clignote quand une autre application l'appelle
+  api.webhook?.onReceived((ev) => {
+    const g = city().buildings.find((b) => b.type === 'gare');
+    if (g) state.world.pulse(g.id, ev.count ? 'run' : 'error');
+    toast(ev.count ? `🚉 La Gare a reçu des données (« ${ev.path} »)` : `🚉 Appel reçu sur « ${ev.path} », mais aucune automatisation n’est en marche à cette adresse.`, ev.count ? 'ok' : 'warn');
+  });
   api.assistant.onEvent((ev) => onAssistant(ev));
   window.addEventListener('keydown', (e) => {
     if (/input|textarea|select/i.test(document.activeElement?.tagName || '')) return;
@@ -159,6 +165,7 @@ async function start() {
       if (state.tool.kind !== 'select') setTool({ kind: 'select' });
       else select(null);
     }
+    if (e.key === '?' || (e.key === 'F1' && (e.preventDefault(), true))) showHelp();
     if (e.key.toLowerCase() === 'v' && !state.editor) state.world.setMode(state.world.mode === 'pov' ? 'orbit' : 'pov');
   });
   refresh();
@@ -200,6 +207,7 @@ function renderTop() {
       h('button', { class: 'fc-btn', title: 'Les personnes de la ville et leurs rôles', onclick: () => showPeople() }, '👥 ', String(c.people.length)),
       h('button', { class: `fc-btn ${state.world?.mode === 'pov' ? 'on' : ''}`, title: 'Se balader à pied dans la ville (V)', onclick: () => state.world.setMode(state.world.mode === 'pov' ? 'orbit' : 'pov') }, state.world?.mode === 'pov' ? '🗺️ Vue d’ensemble' : '🚶 Balade'),
       h('button', { class: 'fc-btn ghost', title: 'Jour / nuit', onclick: () => state.world.setNight(state.world.nightTarget > 0.5 ? 0 : 1) }, state.world?.nightTarget > 0.5 ? '☀️' : '🌙'),
+      h('button', { class: 'fc-btn ghost', title: 'Aide et raccourcis (?)', onclick: () => showHelp() }, '?'),
       h('button', { class: 'fc-avatar-btn', title: st.session?.email || '', onclick: () => openPlace('mairie') }, st.session?.picture ? h('img', { src: st.session.picture, alt: '' }) : '👤'),
     ),
   );
@@ -273,7 +281,7 @@ function toolBtn(kind, icon, label) {
 }
 function setTool(tool) {
   state.tool = tool;
-  state.world.setTool(tool.kind === 'build' ? { kind: 'build', def: buildingDef(tool.type, city().blueprints) } : tool);
+  state.world.setTool(tool.kind === 'build' ? { kind: 'build', def: buildingDef(tool.type, city().blueprints), rot: tool.rot || 0 } : tool);
   renderBuildBar();
   document.body.dataset.tool = tool.kind;
   if (tool.kind === 'road') toast('Clique-glisse sur la carte pour tracer une route. Échap pour arrêter.');
@@ -286,7 +294,24 @@ function startBuild(type) {
   setTool({ kind: 'build', type });
   toast(`${d.emoji} ${d.name} : clique sur la carte pour le poser · R pour pivoter · Échap pour annuler`);
 }
+// Déplacer un bâtiment : même outil que la construction, le bâtiment garde ses réglages
+function startMove(id) {
+  const b = city().buildings.find((x) => x.id === id);
+  if (!b) return;
+  select(null);
+  setTool({ kind: 'build', type: b.type, moveId: id, rot: b.rot || 0 });
+  toast('Clique sur le nouvel emplacement · R pour pivoter · Échap pour annuler');
+}
 async function place(p) {
+  if (state.tool.moveId) {
+    const id = state.tool.moveId;
+    const r = await guard(() => api.city.act({ type: 'move', id, ...p }));
+    if (r) {
+      setTool({ kind: 'select' });
+      select(id);
+    }
+    return;
+  }
   const type = state.tool.type;
   const d = buildingDef(type, city().blueprints);
   const r = await guard(() => api.city.act({ type: 'place', building: type, ...p }));
@@ -311,6 +336,7 @@ function ctxObj() {
     linkable: (b) => (state.linker.opsOf(b, 'trigger').length ? 'trigger' : state.linker.opsOf(b, 'action').length ? 'action' : null),
     openPlace,
     openPeople: () => showPeople(),
+    startMove,
     perms,
     startBuild,
     chooseProfile,
@@ -552,6 +578,29 @@ function onAssistant(ev) {
   if (ev.type === 'text') add({ role: 'ai', text: ev.text });
   else if (ev.type === 'tool') add({ role: 'tool', text: { get_city: '🔎 regarde ta ville…', list_operations: '📖 consulte le catalogue…', create_workflow: '🛠️ prépare un workflow…' }[ev.name] || `🔧 ${ev.name}` });
   else if (ev.type === 'error') add({ role: 'error', text: ev.error });
+}
+
+// ---------- Aide : raccourcis et gestes ----------
+function showHelp() {
+  const rows = [
+    ['Clic', 'Ouvrir un bâtiment'],
+    ['Clic gauche glissé', 'Se déplacer sur la carte'],
+    ['Clic droit glissé', 'Tourner la vue'],
+    ['Molette', 'Zoomer'],
+    ['ZQSD / WASD / flèches', 'Se déplacer (Maj : plus vite)'],
+    ['A / E', 'Tourner la vue'],
+    ['R', 'Pivoter le bâtiment que tu poses ou déplaces'],
+    ['Échap', 'Annuler l’outil / fermer le panneau'],
+    ['V', 'Vue d’ensemble ↔ balade à pied'],
+    ['E (en balade)', 'Entrer dans le bâtiment visé'],
+    ['? ou F1', 'Cette aide'],
+  ];
+  modal(h('div', { class: 'fc-help' },
+    h('h2', {}, '⌨️ Raccourcis et gestes'),
+    h('table', {}, ...rows.map(([k, d]) => h('tr', {}, h('td', {}, h('kbd', {}, k)), h('td', {}, d)))),
+    h('h3', {}, 'Créer une automatisation'),
+    h('p', { class: 'fc-muted' }, '« 🔗 Relier des bâtiments » en haut → clique sur le bâtiment du départ (il brille), puis sur ceux qui agissent, dans l’ordre → réponds aux questions → « Terminer ».'),
+  ));
 }
 
 // ---------- Accueil ----------

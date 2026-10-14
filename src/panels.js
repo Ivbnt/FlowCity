@@ -28,6 +28,7 @@ export function renderPanel(ctx, building, arg) {
   const fn = PANELS[def.panel] || (def.services ? servicePanel : def.blueprint ? blueprintBuildingPanel : genericPanel);
   body.append(...[].concat(fn(ctx, building, def, arg) || []).filter(Boolean));
   const foot = !P.build ? null : h('footer', { class: 'fc-panel-foot' },
+    h('button', { class: 'fc-btn ghost small', title: 'Choisir un nouvel emplacement sur la carte', onclick: () => ctx.startMove(building.id) }, '✋ Déplacer'),
     h('button', { class: 'fc-btn ghost small', onclick: () => guard(() => ctx.api.city.act({ type: 'move', id: building.id, x: building.x, z: building.z, rot: (building.rot + 1) % 4 })) }, '↻ Pivoter'),
     h('span', { class: 'fc-spacer' }),
     h('button', { class: 'fc-btn danger small', onclick: async () => (await confirmBox(`Démolir ${building.name || def.name} ?`, { ok: 'Démolir', danger: true })) && (await guard(() => ctx.api.city.act({ type: 'remove', id: building.id }))) && ctx.select(null) }, '🧨 Démolir'),
@@ -92,6 +93,11 @@ function mairie(ctx) {
     section('Ta ville', h('div', { class: 'fc-row' }, h('input', { class: 'fc-input', value: c.name, onchange: (e) => guard(() => ctx.api.city.act({ type: 'city.rename', name: e.target.value })) })), h('div', { class: 'fc-stats' }, ...stats.map(([i, v, l]) => h('div', {}, h('span', {}, i), h('b', {}, String(v)), h('small', {}, l))))),
     section('Habitants', h('div', { class: 'fc-row wrap' }, ...c.people.slice(0, 8).map((p) => h('span', { class: 'fc-role-badge', title: p.email, style: { '--rc': c.roles.find((r) => r.id === p.roleId)?.color } }, `${c.roles.find((r) => r.id === p.roleId)?.emoji || ''} ${p.name}`)), c.people.length > 8 ? h('small', {}, `+${c.people.length - 8}`) : null), h('button', { class: 'fc-btn block', onclick: () => ctx.openPeople() }, '👥 Gérer les habitants et les rôles')),
     section('Tes tâches', add, tasks),
+    st.demo ? null : section('Fonctionnement',
+      h('label', { class: 'fc-check' }, h('input', { type: 'checkbox', checked: st.background, onchange: (e) => guard(() => ctx.api.settings.set({ background: e.target.checked })).then(ctx.refreshStatus) }), 'Continuer en arrière-plan quand je ferme la fenêtre (les automatisations tournent toujours)'),
+      h('label', { class: 'fc-check' }, h('input', { type: 'checkbox', checked: st.openAtLogin, onchange: (e) => guard(() => ctx.api.settings.set({ openAtLogin: e.target.checked })).then(ctx.refreshStatus) }), 'Lancer Flowcity au démarrage de l’ordinateur (discrètement)'),
+      h('p', { class: 'fc-muted small' }, 'Les automatisations ne tournent que lorsque Flowcity est ouvert. Avec ces deux options, ta ville travaille même quand tu n’y penses plus.'),
+    ),
     section('Utilisation',
       h('div', { class: 'fc-seg wide' },
         h('button', { class: c.usage !== 'pro' ? 'on' : '', onclick: () => guard(() => ctx.api.city.act({ type: 'city.usage', usage: 'learn' })) }, '🎓 Apprendre'),

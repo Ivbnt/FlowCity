@@ -509,7 +509,8 @@ export class World {
       });
       this.ghostModel = model;
       this.ghost.add(model);
-      this.rot = 0;
+      this.rot = this.tool.rot || 0;
+      model.rotation.y = -this.rot * (Math.PI / 2);
     }
     this.el.dataset.tool = this.tool.kind;
   }

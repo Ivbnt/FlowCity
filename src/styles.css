@@ -512,3 +512,7 @@ button.fc-brand { color: inherit; text-align: left; cursor: pointer; }
 .fc-hook { border-bottom: 1px solid var(--line); padding: 6px 0; }
 .fc-list.small { font-size: 12.5px; padding-left: 18px; }
 .fc-usage { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+
+.fc-help table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; }
+.fc-help td { padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.fc-help kbd { font: 600 11.5px ui-monospace, Consolas, monospace; background: rgba(255, 255, 255, 0.1); border: 1px solid var(--line-2); border-radius: 6px; padding: 2px 7px; white-space: nowrap; }

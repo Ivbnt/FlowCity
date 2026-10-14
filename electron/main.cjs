@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const { pathToFileURL } = require('url');
-const { app, BrowserWindow, ipcMain, shell, Notification, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Notification, dialog, Tray, Menu, nativeImage } = require('electron');
 const store = require('./store.cjs');
 const google = require('./google.cjs');
 const { createConnectors, testService } = require('./connectors.cjs');
@@ -349,6 +349,8 @@ function status() {
     googleHasSecret: store.hasSecret('googleClientSecret'),
     model: s.model,
     webhookBase: webhookBase(),
+    background: s.background !== false,
+    openAtLogin: Boolean(s.openAtLogin),
     webhookLocal: `http://127.0.0.1:${Number(s.webhookPort) || 47800}/hook/`,
     webhookLan: Boolean(s.webhookLan),
     webhookPublicUrl: s.webhookPublicUrl || '',
@@ -494,6 +496,15 @@ function registerIpc() {
     const s = store.get('settings');
     if (patch.model) s.model = String(patch.model);
     if (patch.webhookPort) s.webhookPort = Math.max(1024, Math.min(65535, Number(patch.webhookPort) || 47800));
+    if (patch.background !== undefined) s.background = Boolean(patch.background);
+    if (patch.openAtLogin !== undefined) {
+      s.openAtLogin = Boolean(patch.openAtLogin);
+      try {
+        app.setLoginItemSettings({ openAtLogin: s.openAtLogin, args: ['--hidden'] });
+      } catch {
+        /* non pris en charge sur ce système */
+      }
+    }
     const restart = patch.webhookLan !== undefined || patch.webhookPort;
     if (patch.webhookLan !== undefined || patch.webhookPublicUrl !== undefined) requirePerm('settings');
     if (patch.webhookLan !== undefined) s.webhookLan = Boolean(patch.webhookLan);
@@ -550,6 +561,19 @@ function createWindow() {
     return { action: 'deny' };
   });
   win.webContents.on('will-navigate', (e) => e.preventDefault());
+  // Fermer la fenêtre = Flowcity continue en arrière-plan (sauf si désactivé)
+  win.on('close', (e) => {
+    if (quitting || store.get('settings').background === false) return;
+    e.preventDefault();
+    win.hide();
+    setupTray();
+    if (!store.get('settings').backgroundNoticeShown && Notification.isSupported()) {
+      new Notification({ title: 'Flowcity continue de travailler', body: 'Tes automatisations tournent en arrière-plan. Clique sur l’icône Flowcity près de l’horloge pour rouvrir, ou « Quitter » pour tout arrêter.' }).show();
+      const st = store.get('settings');
+      st.backgroundNoticeShown = true;
+      store.set('settings', st);
+    }
+  });
   if (process.env.VITE_DEV_SERVER_URL) win.loadURL(process.env.VITE_DEV_SERVER_URL);
   else win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
 }
@@ -564,9 +588,41 @@ app.whenReady().then(async () => {
   if (last && (last.guest || google.isConnected(last.email))) user = last;
   registerIpc();
   createWindow();
+  if (process.argv.includes('--hidden') && store.get('settings').background !== false) {
+    win.once('ready-to-show', () => win.hide());
+    setupTray();
+  }
   startHookServer();
   setInterval(tick, 30000);
   setTimeout(tick, 5000);
 });
 
-app.on('window-all-closed', () => app.quit());
+// ---------- Arrière-plan : les automatisations continuent quand la fenêtre est fermée ----------
+let tray = null;
+let quitting = false;
+function showWindow() {
+  if (!win || win.isDestroyed()) createWindow();
+  else {
+    win.show();
+    win.focus();
+  }
+}
+function setupTray() {
+  if (tray) return;
+  const icon = nativeImage.createFromPath(path.join(__dirname, '..', 'build', 'icon.png')).resize({ width: 18, height: 18 });
+  tray = new Tray(icon);
+  tray.setToolTip('Flowcity — tes automatisations tournent');
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Ouvrir Flowcity', click: showWindow },
+    { type: 'separator' },
+    { label: 'Quitter (arrête les automatisations)', click: () => ((quitting = true), app.quit()) },
+  ]));
+  tray.on('click', showWindow);
+}
+app.on('before-quit', () => (quitting = true));
+app.on('window-all-closed', () => {
+  if (store.get('settings').background === false) app.quit();
+});
+// Une seule Flowcity à la fois (sinon deux Gares se disputeraient le même port)
+if (!app.requestSingleInstanceLock()) app.quit();
+else app.on('second-instance', showWindow);
