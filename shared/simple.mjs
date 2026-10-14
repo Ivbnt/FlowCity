@@ -5,7 +5,7 @@ import { opDef, SERVICES } from './services.mjs';
 import { buildingDef } from './buildings.mjs';
 
 // Étapes réservées au mode avancé (trop techniques pour le mode simple)
-export const ADVANCED_OPS = new Set(['logic.if', 'logic.set', 'logic.split', 'logic.code', 'http.request', 'flow.subflow', 'webhook.in', 'n8n.webhook', 'make.webhook', 'zapier.webhook']);
+export const ADVANCED_OPS = new Set(['logic.if', 'logic.set', 'logic.split', 'logic.code', 'http.request', 'flow.subflow']);
 
 // Ce que fait chaque étape, en une phrase. Déclencheur : « Quand … » ; action : « <bâtiment> … »
 export const SAY = {
@@ -64,7 +64,8 @@ export const SAY = {
   'n8n.webhook': 'prévient mon outil n8n',
   'make.webhook': 'prévient mon scénario Make',
   'zapier.webhook': 'prévient mon Zap',
-  'webhook.in': 'une autre application appelle ma ville',
+  'webhook.in': 'une autre application m’envoie des données (webhook)',
+  'webhook.send': 'envoie les données à une autre application (webhook)',
   'http.request': 'appelle une API',
   'http.check': 'vérifie qu’un site répond',
   'github.issue': 'crée un ticket GitHub',
@@ -115,18 +116,31 @@ export const FRIENDLY = {
   $month: 'Mois',
 };
 const REVERSE = Object.fromEntries(Object.entries(FRIENDLY).map(([k, v]) => [v.toLowerCase(), k]));
-// {{subject}} → [Objet]
-export function toFriendly(text) {
+// {{subject}} → [Objet]. `extra` = informations propres à cette automatisation (ex. champs d'un webhook : { nom: 'nom' })
+export function toFriendly(text, extra = {}) {
   if (typeof text !== 'string') return text;
-  return text.replace(/\{\{\s*([$\w.-]+)\s*\}\}/g, (m, k) => (FRIENDLY[k] ? `[${FRIENDLY[k]}]` : m));
+  return text.replace(/\{\{\s*([$\w.-]+)\s*\}\}/g, (m, k) => (FRIENDLY[k] ? `[${FRIENDLY[k]}]` : extra[k] ? `[${extra[k]}]` : m));
 }
 // [Objet] → {{subject}}
-export function fromFriendly(text) {
+export function fromFriendly(text, extra = {}) {
   if (typeof text !== 'string') return text;
+  const rev = Object.fromEntries(Object.entries(extra).map(([k, v]) => [String(v).toLowerCase(), k]));
   return text.replace(/\[([^\]\n]+)\]/g, (m, label) => {
-    const k = REVERSE[label.trim().toLowerCase()];
+    const l = label.trim().toLowerCase();
+    const k = REVERSE[l] || rev[l];
     return k ? `{{${k}}}` : m;
   });
+}
+// Informations « sur mesure » apportées par des étapes (ex. les champs attendus d'un webhook reçu)
+export function extraInfos(steps) {
+  const out = {};
+  for (const st of steps) if (st.op === 'webhook.in') for (const f of String(st.params?.fields || '').split(',').map((x) => x.trim()).filter(Boolean)) if (/^[\w.-]+$/.test(f) && !FRIENDLY[f]) out[f] = f;
+  return out;
+}
+// Nom d'adresse webhook lisible et difficile à deviner : « contact-k3x9q »
+export function webhookPath(name) {
+  const slug = String(name || 'adresse').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'adresse';
+  return `${slug}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
 // Champs simplifiés pour les étapes dont les réglages d'origine sont techniques.
@@ -219,6 +233,14 @@ function detailOf(n) {
       return `${p.minutes || 30} min avant`;
     case 'weather.forecast':
       return p.city || '';
+    case 'webhook.in':
+      return p.path ? `adresse « ${p.path} »` : '';
+    case 'webhook.send':
+      try {
+        return new URL(p.url).host;
+      } catch {
+        return '';
+      }
     default:
       return '';
   }

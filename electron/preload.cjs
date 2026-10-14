@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('flow', {
   approval: { respond: invoke('approval:respond'), onRequest: on('approval:request') },
   assistant: { send: invoke('assistant:send'), reset: invoke('assistant:reset'), onEvent: on('assistant:event') },
   settings: { set: invoke('settings:set') },
+  webhook: { test: invoke('webhook:test'), onReceived: on('hook:received') },
   openUrl: invoke('open:url'),
   onToast: on('toast'),
 });

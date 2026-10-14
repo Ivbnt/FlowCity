@@ -120,7 +120,7 @@ export const TEMPLATES = [
     level: 'avancé',
     desc: 'Un site appelle la Gare : la demande est ajoutée à un tableur et tu reçois un mail.',
     needs: ['gare', 'cadastre', 'poste'],
-    nodes: [{ op: 'webhook.in', params: { path: 'contact' } }, { op: 'sheets.append', params: { sheetId: '', range: 'Feuille 1', values: '{{$today}}\n{{body.nom}}\n{{body.message}}' } }, { op: 'gmail.send', params: { to: 'moi@exemple.fr', subject: 'Nouveau message de {{body.nom}}', body: '{{body.message}}' } }],
+    nodes: [{ op: 'webhook.in', params: { path: 'contact', fields: 'nom, email, message' } }, { op: 'sheets.append', params: { sheetId: '', range: 'Feuille 1', values: '{{$today}}\n{{nom}}\n{{email}}\n{{message}}' } }, { op: 'gmail.send', params: { to: 'moi@exemple.fr', subject: 'Nouveau message de {{nom}}', body: '{{message}}\n\nRépondre à : {{email}}' } }],
     edges: [[0, 1], [1, 2]],
   },
   {
@@ -283,10 +283,10 @@ export const TEMPLATES = [
     desc: 'Le formulaire d’embauche appelle la Gare : dossier Drive créé, tâches d’intégration, mail de bienvenue préparé.',
     needs: ['gare', 'archives', 'poste'],
     nodes: [
-      { op: 'webhook.in', params: { path: 'nouvel-arrivant' } },
-      { op: 'drive.folder', params: { parentId: 'root', name: 'Salariés/{{body.nom}}' } },
-      { op: 'flow.task', params: { title: 'Préparer le poste de {{body.nom}} (arrivée le {{body.date}})', priority: '1' } },
-      { op: 'gmail.draft', params: { to: '{{body.email}}', subject: 'Bienvenue {{body.prenom}} !', body: 'Bonjour {{body.prenom}},\n\nToute l’équipe est ravie de t’accueillir le {{body.date}}. Voici ce qu’il faut apporter le premier jour…' } },
+      { op: 'webhook.in', params: { path: 'nouvel-arrivant', fields: 'prenom, nom, email, date' } },
+      { op: 'drive.folder', params: { parentId: 'root', name: 'Salariés/{{prenom}} {{nom}}' } },
+      { op: 'flow.task', params: { title: 'Préparer le poste de {{prenom}} {{nom}} (arrivée le {{date}})', priority: '1' } },
+      { op: 'gmail.draft', params: { to: '{{email}}', subject: 'Bienvenue {{prenom}} !', body: 'Bonjour {{prenom}},\n\nToute l’équipe est ravie de t’accueillir le {{date}}. Voici ce qu’il faut apporter le premier jour…' } },
     ],
     edges: [[0, 1], [1, 2], [2, 3]],
   },
@@ -353,6 +353,60 @@ export const TEMPLATES = [
     ],
     edges: [[0, 1], [1, 2], [2, 3]],
   },
+  // ----- Professionnels (webhooks) -----
+  {
+    id: 'commande',
+    profiles: ['pro'],
+    name: 'Nouvelle commande → tableau + équipe',
+    level: 'débutant',
+    desc: 'Ta boutique ou ton logiciel envoie chaque commande à la Gare : elle est ajoutée au tableau de suivi et l’équipe est prévenue sur Slack.',
+    needs: ['gare', 'cadastre', 'messageries'],
+    nodes: [
+      { op: 'webhook.in', params: { path: 'commandes', fields: 'client, email, montant, commande' } },
+      { op: 'sheets.append', params: { sheetId: '', range: 'Commandes', values: '{{$today}}\n{{commande}}\n{{client}}\n{{email}}\n{{montant}}' } },
+      { op: 'slack.send', params: { text: '🛒 Nouvelle commande {{commande}} : {{client}} ({{montant}} €)' } },
+    ],
+    edges: [[0, 1], [1, 2]],
+  },
+  {
+    id: 'prospect',
+    profiles: ['pro'],
+    name: 'Formulaire du site → CRM',
+    level: 'intermédiaire',
+    desc: 'Le formulaire de contact du site arrive à la Gare ; l’IA résume la demande, puis tout part dans ton CRM (webhook) et tu reçois un mail.',
+    needs: ['gare', 'labo', 'poste'],
+    nodes: [
+      { op: 'webhook.in', params: { path: 'contact', fields: 'nom, email, entreprise, message' } },
+      { op: 'claude.ask', params: { prompt: 'Résume cette demande de prospect en une phrase et propose une priorité (haute, moyenne, basse) :\n{{message}}' } },
+      { op: 'webhook.send', params: { url: 'https://mon-crm.exemple.com/webhook', fields: 'nom = {{nom}}\nemail = {{email}}\nentreprise = {{entreprise}}\nresume = {{answer}}' } },
+      { op: 'gmail.send', params: { to: 'moi@exemple.fr', subject: 'Nouveau prospect : {{nom}} ({{entreprise}})', body: '{{answer}}\n\n{{message}}\n\nContact : {{email}}' } },
+    ],
+    edges: [[0, 1], [1, 2], [2, 3]],
+  },
+  {
+    id: 'paiement',
+    profiles: ['pro'],
+    name: 'Paiement reçu → remerciement',
+    level: 'intermédiaire',
+    desc: 'Ton outil de paiement prévient la Gare à chaque paiement : un mail de remerciement part au client et la vente est notée.',
+    needs: ['gare', 'poste', 'cadastre'],
+    nodes: [
+      { op: 'webhook.in', params: { path: 'paiements', fields: 'client, email, montant' } },
+      { op: 'gmail.send', params: { to: '{{email}}', subject: 'Merci pour votre paiement', body: 'Bonjour {{client}},\n\nNous avons bien reçu votre paiement de {{montant}} €. Merci pour votre confiance !' } },
+      { op: 'sheets.append', params: { sheetId: '', range: 'Ventes', values: '{{$today}}\n{{client}}\n{{montant}}' } },
+    ],
+    edges: [[0, 1], [1, 2]],
+  },
+  {
+    id: 'relais',
+    profiles: ['pro', 'tech'],
+    name: 'Relais entre deux outils',
+    level: 'débutant',
+    desc: 'Un outil envoie des données à la Gare, Flowcity les transmet à un autre outil (webhook) et garde une trace dans le journal.',
+    needs: ['gare'],
+    nodes: [{ op: 'webhook.in', params: { path: 'relais', fields: 'evenement, details' } }, { op: 'webhook.send', params: { url: 'https://autre-outil.exemple.com/webhook' } }, { op: 'flow.note', params: { text: 'Relais : {{evenement}}' } }],
+    edges: [[0, 1], [1, 2]],
+  },
 ];
 
 // Profils d'usage : proposés au premier lancement pour suggérer bâtiments et recettes.
@@ -362,5 +416,6 @@ export const PROFILES = [
   { id: 'rh', emoji: '🧑‍💼', name: 'RH & recrutement', desc: 'Trier les CV, accuser réception, préparer les entretiens, accueillir les nouveaux.', buildings: ['poste', 'archives', 'cadastre', 'beffroi', 'labo', 'messageries'] },
   { id: 'tech', emoji: '💻', name: 'Informatique & dev', desc: 'Surveiller des sites, API, GitHub, alertes d’équipe, webhooks.', buildings: ['tour_dev', 'gare', 'centre_tri', 'messageries', 'tour_radio', 'labo'] },
   { id: 'reseaux', emoji: '📣', name: 'Réseaux & communauté', desc: 'Relayer tes contenus, faire vivre un Discord, préparer tes publications.', buildings: ['studio_media', 'messageries', 'tour_dev', 'labo', 'tour_radio'] },
+  { id: 'pro', emoji: '💼', name: 'Entreprise & indépendants', desc: 'Commandes, clients, formulaires et outils métier reliés par webhooks.', buildings: ['gare', 'cadastre', 'messageries', 'poste', 'labo', 'centre_tri'] },
   { id: 'perso', emoji: '🏠', name: 'Vie perso', desc: 'Rappels, météo, tâches, factures, maison connectée.', buildings: ['maison', 'beffroi', 'tour_radio', 'maison_connectee', 'poste'] },
 ];

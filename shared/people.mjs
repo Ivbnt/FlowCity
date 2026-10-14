@@ -26,7 +26,7 @@ export const ACTION_PERM = {
   'workflow.save': 'automate', 'workflow.fromTemplate': 'automate', 'workflow.delete': 'automate',
   'workflow.toggle': 'run',
   'task.add': 'tasks', 'task.update': 'tasks', 'task.delete': 'tasks', 'notes.save': 'tasks',
-  'city.rename': 'settings', 'city.sandbox': 'settings', 'city.profile': 'settings', reset: 'settings', taxes: 'settings',
+  'city.rename': 'settings', 'city.sandbox': 'settings', 'city.profile': 'settings', 'city.usage': 'settings', reset: 'settings', taxes: 'settings',
   'people.add': 'people', 'people.update': 'people', 'people.remove': 'people',
   'role.save': 'roles', 'role.delete': 'roles',
 };

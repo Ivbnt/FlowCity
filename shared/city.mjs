@@ -22,6 +22,7 @@ export function newCity(owner = {}) {
     xp: 0,
     sandbox: true, // bac à sable par défaut : tout est débloqué et gratuit
     profile: null,
+    usage: 'learn', // 'learn' (missions, explications) ou 'pro' (direct)
     buildings: [],
     roads: [],
     workflows: [],
@@ -537,6 +538,9 @@ export function applyAction(city, action, actor) {
     }
     case 'autobuild':
       result.info = autoBuild(city, a.buildings || []);
+      break;
+    case 'city.usage':
+      city.usage = a.usage === 'pro' ? 'pro' : 'learn';
       break;
     case 'city.profile':
       city.profile = String(a.profile || '') || null;

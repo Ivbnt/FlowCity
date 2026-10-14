@@ -366,12 +366,30 @@ export const SERVICES = {
     ops: { 'zapier.webhook': { kind: 'action', label: 'Lancer un Zap', desc: 'Appelle le webhook « Catch Hook » d’un Zap.', fields: [T('url', 'URL du webhook', { required: true, placeholder: 'https://hooks.zapier.com/…' })], outputs: ['response'], real: true, write: true } },
   },
   webhook: {
-    name: 'Webhook (Gare)',
+    name: 'Webhooks (Gare)',
     icon: '🚉',
     category: 'automation',
     auth: { kind: 'none' },
-    desc: 'Une adresse que d’autres applis peuvent appeler pour démarrer ton workflow.',
-    ops: { 'webhook.in': { kind: 'trigger', label: 'Appel webhook reçu', desc: 'Démarre quand une appli envoie une requête à l’adresse de la Gare (sur ton ordinateur : http://127.0.0.1:47800/hook/…).', fields: [T('path', 'Nom de l’adresse', { required: true, placeholder: 'formulaire-contact' })], outputs: ['body', 'query', 'receivedAt'], real: true } },
+    desc: 'Les webhooks : des adresses web pour que tes applications se préviennent entre elles. On reçoit (arrivées) et on envoie (départs).',
+    ops: {
+      'webhook.in': {
+        kind: 'trigger',
+        label: 'Données reçues d’une autre application',
+        desc: 'Ta ville te donne une adresse web. Quand un formulaire, un site ou un outil (Typeform, Tally, Stripe, Zapier, ton logiciel métier…) envoie des données à cette adresse, l’automatisation démarre avec ces données.',
+        fields: [T('path', 'Nom de l’adresse', { required: true, placeholder: 'formulaire-contact' }), T('fields', 'Informations attendues (séparées par des virgules)', { placeholder: 'nom, email, message' })],
+        outputs: ['receivedAt', 'body', 'query'],
+        real: true,
+      },
+      'webhook.send': {
+        kind: 'action',
+        label: 'Envoyer les données à une autre application',
+        desc: 'Envoie les informations de l’automatisation (au format JSON) à l’adresse webhook d’une autre application : un outil métier, un CRM, Zapier, Make, n8n, Slack…',
+        fields: [T('url', 'Adresse webhook de l’autre application', { required: true, placeholder: 'https://…' }), TA('fields', 'Informations à envoyer (une par ligne : nom = valeur ; vide = tout)', { placeholder: 'client = [Expéditeur]\nsujet = [Objet]' }), T('secret', 'Clé secrète (facultatif, envoyée en en-tête Authorization)')],
+        outputs: ['status', 'response'],
+        real: true,
+        write: true,
+      },
+    },
   },
   http: {
     name: 'Requête HTTP (n’importe quelle API)',

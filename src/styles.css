@@ -502,3 +502,13 @@ button.fc-brand { color: inherit; text-align: left; cursor: pointer; }
 .fc-city-menu button { display: flex; flex-direction: column; align-items: flex-start; padding: 7px 9px; border-radius: 8px; text-align: left; }
 .fc-city-menu button small { color: var(--muted); }
 .fc-city-menu button:hover, .fc-city-menu button.on { background: rgba(255, 255, 255, 0.08); }
+
+/* ---------- Webhooks ---------- */
+.fc-webhook { border: 1px solid rgba(51, 198, 255, 0.4); background: rgba(51, 198, 255, 0.07); border-radius: 12px; padding: 10px 12px; margin: 10px 0; }
+.fc-webhook details { margin-top: 6px; }
+.fc-webhook summary, .fc-hook summary { cursor: pointer; color: var(--accent-2); font-size: 12.5px; }
+.fc-webhook .fc-sample, .fc-hook .fc-sample { width: 100%; max-height: 180px; }
+.fc-url { flex: 1; min-width: 0; word-break: break-all; font: 12px ui-monospace, Consolas, monospace; background: rgba(0, 0, 0, 0.35); padding: 7px 9px; border-radius: 8px; color: #bfeaff; user-select: all; }
+.fc-hook { border-bottom: 1px solid var(--line); padding: 6px 0; }
+.fc-list.small { font-size: 12.5px; padding-left: 18px; }
+.fc-usage { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }

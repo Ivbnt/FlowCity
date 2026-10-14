@@ -129,3 +129,23 @@ test('habitants et rôles', () => {
   assert.equal(c.people.find((p) => p.email === 'dan@x.fr').roleId, 'membre');
   assert.throws(() => applyAction(c, { type: 'people.remove', email: 'ada@x.fr' }, ada), /créateur/);
 });
+
+test('webhooks en mode simple', async () => {
+  const { extraInfos, toFriendly, fromFriendly, webhookPath, describe } = await import('../shared/simple.mjs');
+  const steps = [{ op: 'webhook.in', params: { path: 'contact', fields: 'nom, email, message' } }];
+  const extra = extraInfos(steps);
+  assert.deepEqual(Object.keys(extra), ['nom', 'email', 'message']);
+  assert.equal(fromFriendly('Message de [nom] ([email]) : [Objet]', extra), 'Message de {{nom}} ({{email}}) : {{subject}}');
+  assert.equal(toFriendly('{{nom}} / {{message}}', extra), '[nom] / [message]');
+  assert.match(webhookPath('Formulaire de Contact !'), /^formulaire-de-contact-[a-z0-9]{5}$/);
+  // Les données d'exemple suivent les informations attendues, et sont utilisables directement
+  const [item] = mockCall('webhook.in', { fields: 'nom, montant' });
+  assert.equal(item.nom, 'Léa Martin');
+  assert.equal(item.body.montant, '120');
+  const w = { nodes: [{ id: 'a', op: 'webhook.in', params: { path: 'contact-ab12c' } }, { id: 'b', op: 'webhook.send', params: { url: 'https://crm.exemple.com/hook' } }], edges: [{ from: 'a', to: 'b' }] };
+  const s = describe(w, null);
+  assert.match(s[0].text, /webhook.*contact-ab12c/);
+  assert.match(s[1].text, /crm\.exemple\.com/);
+  const r = await runWorkflow({ id: 'w', name: 'x', ...w, nodes: [w.nodes[0], { id: 'b', op: 'flow.note', params: { text: 'Merci {{nom}}' } }] }, { adapter, triggerItems: [{ nom: 'Bob', body: { nom: 'Bob' } }] });
+  assert.ok(r.ok);
+});

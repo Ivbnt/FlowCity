@@ -196,6 +196,7 @@ function renderTop() {
     h('div', { class: 'fc-top-actions' },
       perms().automate ? h('button', { class: 'fc-btn primary', title: 'Créer une automatisation en cliquant sur tes bâtiments', onclick: () => startLinking() }, '🔗 Relier des bâtiments') : null,
       h('button', { class: 'fc-btn', onclick: () => showAutomations() }, '📋 Mes automatisations'),
+      c.usage === 'pro' && perms().automate ? h('button', { class: 'fc-btn', title: 'Éditeur en schéma (aiguillages, formules, API)', onclick: () => openEditor() }, '🧩 Schéma') : null,
       h('button', { class: 'fc-btn', title: 'Les personnes de la ville et leurs rôles', onclick: () => showPeople() }, '👥 ', String(c.people.length)),
       h('button', { class: `fc-btn ${state.world?.mode === 'pov' ? 'on' : ''}`, title: 'Se balader à pied dans la ville (V)', onclick: () => state.world.setMode(state.world.mode === 'pov' ? 'orbit' : 'pov') }, state.world?.mode === 'pov' ? '🗺️ Vue d’ensemble' : '🚶 Balade'),
       h('button', { class: 'fc-btn ghost', title: 'Jour / nuit', onclick: () => state.world.setNight(state.world.nightTarget > 0.5 ? 0 : 1) }, state.world?.nightTarget > 0.5 ? '☀️' : '🌙'),
@@ -208,7 +209,7 @@ function renderTop() {
 function renderMission() {
   const c = city();
   const el = $('#fc-mission');
-  if (!perms().build && !perms().automate) return put(el); // les missions servent à apprendre à construire
+  if ((!perms().build && !perms().automate) || city().usage === 'pro') return put(el); // missions : pour apprendre
   if (state.missionHidden) return put(el, h('button', { class: 'fc-mission-mini', onclick: () => ((state.missionHidden = false), renderMission()) }, '🎓'));
   const ms = missionStatus(c);
   const m = ms.current;
@@ -525,7 +526,7 @@ function askApproval(req) {
 function celebrate(ids) {
   const c = city();
   const done = ids.map((id) => MISSIONS.find((x) => x.id === id)).filter(Boolean);
-  if (!done.length) return;
+  if (!done.length || c.usage === 'pro') return;
   if (state.celebration?.el.isConnected) {
     state.celebration.list.append(...done.map(missionLine));
     return;
@@ -559,6 +560,17 @@ function chooseProfile(id) {
 }
 function welcome() {
   const c = city();
+  let usage = 'learn';
+  const usageSeg = h('div', { class: 'fc-usage' },
+    ...[['learn', '🎓', 'Je veux apprendre', 'Missions guidées, explications, récompenses.'], ['pro', '💼', 'Pour mon travail', 'Direct à l’essentiel : webhooks, recettes pro, éditeur en schéma.']].map(([id, em, t, d]) =>
+      h('button', { class: `fc-profile ${id === usage ? 'on' : ''}`, onclick: (e) => {
+        usage = id;
+        usageSeg.querySelectorAll('.fc-profile').forEach((x) => x.classList.remove('on'));
+        e.currentTarget.classList.add('on');
+        guard(() => api.city.act({ type: 'city.usage', usage: id }));
+      } }, h('span', {}, em), h('b', {}, t), h('small', {}, d)),
+    ),
+  );
   const grid = h('div', { class: 'fc-profiles' }, ...PROFILES.map((p) => h('button', { class: 'fc-profile', onclick: (e) => {
     grid.querySelectorAll('.fc-profile').forEach((x) => x.classList.remove('on'));
     e.currentTarget.classList.add('on');
@@ -567,7 +579,8 @@ function welcome() {
   const box = modal(h('div', { class: 'fc-welcome' },
     h('div', { class: 'fc-welcome-logo' }, logoSvg(52), h('span', { class: 'fc-wordmark' }, h('span', { class: 'a' }, 'Flow'), h('span', { class: 'b' }, 'city'))),
     h('h2', {}, `Bienvenue, ${c.owner?.name?.split(' ')[0] || 'maire'} !`),
-    h('p', {}, 'Ta carte est vide : c’est toi qui construis tout, comme dans SimCity. Chaque bâtiment représente un de tes outils (la Poste = tes mails, les Archives = tes fichiers…). Pour automatiser, tu relies simplement les bâtiments entre eux.'),
+    h('p', {}, 'Ta carte est vide : c’est toi qui construis tout, comme dans SimCity. Chaque bâtiment représente un de tes outils (la Poste = tes mails, la Gare = les webhooks…). Pour automatiser, tu relies simplement les bâtiments entre eux.'),
+    usageSeg,
     h('p', { class: 'fc-muted' }, 'Qu’est-ce qui t’intéresse ? Les bâtiments utiles seront marqués d’une ★ (facultatif).'),
     grid,
     h('div', { class: 'fc-row end' }, h('button', { class: 'fc-btn primary', onclick: () => {

@@ -92,6 +92,13 @@ function mairie(ctx) {
     section('Ta ville', h('div', { class: 'fc-row' }, h('input', { class: 'fc-input', value: c.name, onchange: (e) => guard(() => ctx.api.city.act({ type: 'city.rename', name: e.target.value })) })), h('div', { class: 'fc-stats' }, ...stats.map(([i, v, l]) => h('div', {}, h('span', {}, i), h('b', {}, String(v)), h('small', {}, l))))),
     section('Habitants', h('div', { class: 'fc-row wrap' }, ...c.people.slice(0, 8).map((p) => h('span', { class: 'fc-role-badge', title: p.email, style: { '--rc': c.roles.find((r) => r.id === p.roleId)?.color } }, `${c.roles.find((r) => r.id === p.roleId)?.emoji || ''} ${p.name}`)), c.people.length > 8 ? h('small', {}, `+${c.people.length - 8}`) : null), h('button', { class: 'fc-btn block', onclick: () => ctx.openPeople() }, '👥 Gérer les habitants et les rôles')),
     section('Tes tâches', add, tasks),
+    section('Utilisation',
+      h('div', { class: 'fc-seg wide' },
+        h('button', { class: c.usage !== 'pro' ? 'on' : '', onclick: () => guard(() => ctx.api.city.act({ type: 'city.usage', usage: 'learn' })) }, '🎓 Apprendre'),
+        h('button', { class: c.usage === 'pro' ? 'on' : '', onclick: () => guard(() => ctx.api.city.act({ type: 'city.usage', usage: 'pro' })) }, '💼 Professionnel'),
+      ),
+      h('p', { class: 'fc-muted small' }, c.usage === 'pro' ? 'Sans missions ni célébrations ; l’éditeur en schéma est accessible directement en haut.' : 'Missions de l’École, explications et récompenses pour apprendre pas à pas.'),
+    ),
     section('Mode de jeu',
       h('div', { class: 'fc-seg wide' },
         h('button', { class: c.sandbox ? 'on' : '', onclick: () => guard(() => ctx.api.city.act({ type: 'city.sandbox', on: true })) }, '🧱 Bac à sable'),
@@ -435,10 +442,48 @@ function observatoire(ctx) {
   return [section('Exécutions (14 jours)', chart), section(`Temps gagné : ${fmtMinutes(savedMinutes(c))}`, h('p', { class: 'fc-muted small' }, 'Estimation : 1 minute par action réelle, 2 par action qui écrit ou envoie quelque chose.'), ...byWf.map(({ w, saved }) => h('div', { class: 'fc-row' }, h('span', { class: 'grow' }, w.name), h('b', {}, fmtMinutes(saved)))))];
 }
 
+// ---------- Gare : webhooks ----------
+function gare(ctx, b, def) {
+  const c = ctx.city();
+  const st = ctx.status();
+  const P = ctx.perms();
+  const base = st.webhookBase || 'http://127.0.0.1:47800/hook/';
+  const hooks = c.workflows.flatMap((w) => w.nodes.filter((n) => n.op === 'webhook.in').map((n) => ({ w, n })));
+  const sends = c.workflows.filter((w) => w.nodes.some((n) => ['webhook.send', 'n8n.webhook', 'make.webhook', 'zapier.webhook'].includes(n.op)));
+  const mode = st.webhookPublicUrl ? 'public' : st.webhookLan ? 'lan' : 'local';
+  const pub = h('input', { class: 'fc-input', placeholder: 'https://ma-ville.mon-domaine.fr', value: st.webhookPublicUrl || '' });
+  const setMode = (m) => guard(() => ctx.api.settings.set({ webhookLan: m !== 'local', webhookPublicUrl: m === 'public' ? pub.value : '' })).then((r) => r && ctx.refreshStatus());
+  return [
+    section('🚉 Arrivées (on reçoit des données)',
+      h('p', { class: 'fc-muted small' }, 'Un webhook, c’est une adresse web qu’une application appelle pour en prévenir une autre : « une commande vient d’arriver », « un formulaire a été rempli »… C’est la base des automatisations entre applications.'),
+      hooks.length
+        ? hooks.map(({ w, n }) => h('div', { class: 'fc-hook' }, h('div', { class: 'fc-row' }, h('span', {}, w.enabled ? '🟢' : '⚪'), h('b', { class: 'grow' }, w.name)), h('div', { class: 'fc-row' }, h('code', { class: 'fc-url' }, `${base}${n.params.path}`), h('button', { class: 'fc-btn small', onclick: () => navigator.clipboard?.writeText(`${base}${n.params.path}`).then(() => toast('Adresse copiée', 'ok')) }, '📋'))))
+        : h('p', { class: 'fc-muted small' }, 'Aucune adresse pour l’instant.'),
+      P.automate ? h('button', { class: 'fc-btn primary block', onclick: () => ctx.startLinking({ buildingId: b.id }) }, '➕ Créer une adresse de réception') : null,
+    ),
+    section('🚆 Départs (on envoie des données)', h('p', { class: 'fc-muted small' }, 'Dans une automatisation, clique sur la Gare puis « envoie les données à une autre application » et colle l’adresse webhook de cette application (ton CRM, ton logiciel de facturation, Zapier, Make, n8n…).'), sends.length ? h('ul', { class: 'fc-list small' }, ...sends.map((w) => h('li', {}, w.name))) : null),
+    section('Qui peut appeler la Gare ?',
+      h('div', { class: 'fc-seg wide' },
+        h('button', { class: mode === 'local' ? 'on' : '', disabled: !P.settings, onclick: () => setMode('local') }, '🖥️ Cet ordinateur'),
+        h('button', { class: mode === 'lan' ? 'on' : '', disabled: !P.settings, onclick: () => setMode('lan') }, '🏢 Le réseau du bureau'),
+        h('button', { class: mode === 'public' ? 'on' : '', disabled: !P.settings, onclick: () => (pub.value ? setMode('public') : pub.focus()) }, '🌐 Internet'),
+      ),
+      h('p', { class: 'fc-muted small' }, mode === 'local' ? 'Seules les applications de cet ordinateur peuvent appeler la Gare (le plus sûr pour apprendre).' : mode === 'lan' ? `Les ordinateurs du même réseau peuvent l’appeler (adresse ${st.lanIp || '?'}). Chaque adresse contient un code difficile à deviner.` : 'Les applications en ligne (Stripe, Typeform…) passent par ton adresse publique.'),
+      h('details', { open: mode === 'public' },
+        h('summary', { class: 'fc-muted small' }, '🌐 Recevoir depuis Internet (pour les pros)'),
+        h('p', { class: 'fc-muted small' }, 'Les services en ligne ne peuvent pas joindre ton ordinateur directement. Crée un tunnel sécurisé (gratuit) qui donne une adresse https publique vers la Gare : par exemple « cloudflared tunnel --url http://localhost:47800 » (Cloudflare Tunnel) ou « ngrok http 47800 ». Colle ici l’adresse obtenue :'),
+        h('div', { class: 'fc-row' }, pub, h('button', { class: 'fc-btn small', disabled: !P.settings, onclick: () => setMode('public') }, 'Utiliser')),
+        h('p', { class: 'fc-muted small' }, 'Flowcity doit rester ouvert pour recevoir les appels. Pour une disponibilité 24 h/24, fais tourner Flowcity sur un ordinateur toujours allumé.'),
+      ),
+    ),
+    ...servicePanel(ctx, b, def),
+  ];
+}
+
 // ---------- Banque ----------
 function banque(ctx, b, def) {
   const c = ctx.city();
   return [...servicePanel(ctx, b, def), c.sandbox ? null : section(`Trésor : ${c.credits} crédits`, h('ul', { class: 'fc-journal' }, ...c.ledger.slice(0, 30).map((l) => h('li', {}, h('b', { class: l.amount > 0 ? 'pos' : 'neg' }, `${l.amount > 0 ? '+' : ''}${l.amount}`), ' ', l.label))))].filter(Boolean);
 }
 
-const PANELS = { mairie, maison, ecole, bibliotheque, centrale, labo, atelier, architecte, caserne, hopital, commissariat, observatoire, banque };
+const PANELS = { gare, mairie, maison, ecole, bibliotheque, centrale, labo, atelier, architecte, caserne, hopital, commissariat, observatoire, banque };

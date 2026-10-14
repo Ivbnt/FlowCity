@@ -5,7 +5,7 @@ import { h, put, toast, guard } from './dom.js';
 import { SERVICES, opDef, defaultParams, fieldVisible } from '../shared/services.mjs';
 import { buildingDef, blueprintOp, providersOf } from '../shared/buildings.mjs';
 import { uid } from '../shared/engine.mjs';
-import { ADVANCED_OPS, say, toFriendly, fromFriendly, simpleFields, SIMPLE_FIELDS, infosAfter, FRIENDLY, describe, shortName, isLinear } from '../shared/simple.mjs';
+import { ADVANCED_OPS, say, toFriendly, fromFriendly, simpleFields, SIMPLE_FIELDS, infosAfter, FRIENDLY, describe, shortName, isLinear, extraInfos, webhookPath } from '../shared/simple.mjs';
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -127,7 +127,11 @@ export class Linker {
     const special = SIMPLE_FIELDS[op];
     if (special) for (const f of special.fields) if (simple[f.key] === undefined && f.default !== undefined) simple[f.key] = f.default;
     const before = (editIndex !== null ? this.steps.slice(0, editIndex) : this.steps).map((s) => s.op);
-    const infos = infosAfter(before);
+    const prevSteps = editIndex !== null ? this.steps.slice(0, editIndex) : this.steps;
+    const extra = extraInfos(prevSteps);
+    const label = (k) => FRIENDLY[k] || extra[k] || k;
+    const infos = [...Object.keys(extra), ...infosAfter(before)];
+    if (op === 'webhook.in' && !params.path) params.path = webhookPath(this.wf?.name || shortName(def));
     let focused = null;
     const rows = [];
     const values = special ? simple : params;
@@ -140,11 +144,11 @@ export class Linker {
         if (!special && d.fields.some((x) => x.showIf && Object.keys(x.showIf).includes(f.key))) this.form(b, o, editIndex, { params, simple });
       };
       let input;
-      if (f.type === 'info') input = h('select', { class: 'fc-input', onchange: (e) => set(e.target.value) }, ...(infos.length ? infos : ['subject']).map((k) => h('option', { value: `{{${k}}}`, selected: v === `{{${k}}}` }, FRIENDLY[k] || k)));
+      if (f.type === 'info') input = h('select', { class: 'fc-input', onchange: (e) => set(e.target.value) }, ...(infos.length ? infos : ['subject']).map((k) => h('option', { value: `{{${k}}}`, selected: v === `{{${k}}}` }, label(k))));
       else if (f.type === 'select') input = h('select', { class: 'fc-input', onchange: (e) => set(e.target.value) }, ...f.options.map(([val, l]) => h('option', { value: val, selected: String(v || f.default || '') === val }, l)));
       else if (f.type === 'bool') input = h('label', { class: 'fc-check' }, h('input', { type: 'checkbox', checked: Boolean(v), onchange: (e) => set(e.target.checked) }), f.label);
-      else if (f.type === 'textarea') input = h('textarea', { class: 'fc-input', rows: 4, placeholder: toFriendly(f.placeholder || ''), oninput: (e) => (values[f.key] = fromFriendly(e.target.value)), onfocus: (e) => (focused = e.target) }, toFriendly(v));
-      else input = h('input', { class: 'fc-input', type: f.type === 'number' ? 'number' : 'text', value: toFriendly(String(v)), placeholder: toFriendly(f.placeholder || ''), oninput: (e) => (values[f.key] = fromFriendly(e.target.value)), onfocus: (e) => (focused = e.target) });
+      else if (f.type === 'textarea') input = h('textarea', { class: 'fc-input', rows: 4, placeholder: toFriendly(f.placeholder || ''), oninput: (e) => (values[f.key] = fromFriendly(e.target.value, extra)), onfocus: (e) => (focused = e.target) }, toFriendly(v, extra));
+      else input = h('input', { class: 'fc-input', type: f.type === 'number' ? 'number' : 'text', value: toFriendly(String(v), extra), placeholder: toFriendly(f.placeholder || ''), oninput: (e) => (values[f.key] = fromFriendly(e.target.value, extra)), onfocus: (e) => (focused = e.target) });
       rows.push(f.type === 'bool' ? input : h('label', { class: 'fc-field' }, h('span', {}, f.label, f.required ? ' *' : ''), input));
     }
     const svc = SERVICES[op.split('.')[0]];
@@ -152,7 +156,7 @@ export class Linker {
     const chips = infos.length || d.kind !== 'trigger'
       ? h('div', { class: 'fc-lc-infos' },
           h('small', {}, infos.length ? 'Ajouter une information de l’étape d’avant :' : 'Ajouter :'),
-          h('div', { class: 'fc-chips tabs' }, ...[...infos, '$today', '$time'].map((k) => h('button', { class: 'fc-chip', onclick: () => insert(`[${FRIENDLY[k]}]`) }, FRIENDLY[k]))),
+          h('div', { class: 'fc-chips tabs' }, ...[...infos, '$today', '$time'].map((k) => h('button', { class: 'fc-chip', onclick: () => insert(`[${label(k)}]`) }, label(k)))),
         )
       : null;
     function insert(t) {
@@ -170,11 +174,13 @@ export class Linker {
       h('p', { class: 'fc-muted small' }, d.desc),
       connected ? null : h('p', { class: 'fc-alert' }, `🔌 ${svc.name} n’est pas encore branché. Tu peux quand même essayer (en simulation) ; pour que ça marche pour de vrai, branche-le à la Centrale électrique.`),
       ...rows,
+      op === 'webhook.in' ? this.webhookBox(params) : null,
       d.kind !== 'trigger' ? chips : null,
       h('div', { class: 'fc-row end' },
         editIndex === null && this.opsOf(b).length > 1 ? h('button', { class: 'fc-btn ghost', onclick: () => this.choose(b, this.opsOf(b)) }, '← Autre choix') : null,
         h('button', { class: 'fc-btn primary', onclick: () => {
           const finalParams = special ? { ...params, ...special.compose(simple) } : params;
+          if (op === 'webhook.in') finalParams.path = String(finalParams.path || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-|-$/g, '') || webhookPath('adresse');
           const step = { id: prev?.id || uid('n'), op, params: finalParams, simple: special ? simple : null, buildingId: b.id, label: o.label || '' };
           if (editIndex !== null) this.steps[editIndex] = step;
           else this.steps.push(step);
@@ -188,6 +194,35 @@ export class Linker {
     this.card.querySelector('textarea, input[type=text]')?.focus();
   }
 
+  // Adresse de la Gare à donner à l'autre application, avec la marche à suivre
+  webhookBox(params, { live = false } = {}) {
+    const st = this.ctx.status();
+    const base = st.webhookBase || 'http://127.0.0.1:47800/hook/';
+    const url = () => `${base}${params.path}`;
+    const urlEl = h('code', { class: 'fc-url' }, url());
+    const fields = String(params.fields || '').split(',').map((x) => x.trim()).filter(Boolean);
+    const example = Object.fromEntries((fields.length ? fields : ['nom', 'email', 'message']).map((f) => [f, '…']));
+    const local = /127\.0\.0\.1/.test(base);
+    return h('div', { class: 'fc-webhook' },
+      h('b', {}, '📮 L’adresse de ta Gare'),
+      h('div', { class: 'fc-row' }, urlEl, h('button', { class: 'fc-btn small', onclick: () => navigator.clipboard?.writeText(url()).then(() => toast('Adresse copiée : colle-la dans l’autre application.', 'ok')) }, '📋 Copier')),
+      h('p', { class: 'fc-muted small' }, local ? '🖥️ Pour l’instant, seules les applications de cet ordinateur peuvent l’appeler. Pour le bureau ou Internet : Gare → « Qui peut appeler la Gare ? ».' : '🌐 Cette adresse est joignable depuis l’extérieur de ton ordinateur.'),
+      h('details', {},
+        h('summary', {}, 'Comment l’utiliser ?'),
+        h('ol', { class: 'fc-list small' },
+          h('li', {}, 'Dans l’autre application (Typeform, Tally, Stripe, Zapier, Make, ton site, ton logiciel métier…), cherche « Webhook » ou « URL de notification ».'),
+          h('li', {}, 'Colle l’adresse ci-dessus. Les données doivent arriver en JSON ou comme un formulaire.'),
+          h('li', {}, 'Mets l’automatisation en marche : chaque envoi la démarre, et les informations reçues deviennent des étiquettes [nom], [email]…'),
+        ),
+        h('small', { class: 'fc-muted' }, 'Exemple de données attendues :'),
+        h('pre', { class: 'fc-sample' }, JSON.stringify(example, null, 2)),
+        h('small', { class: 'fc-muted' }, 'Formulaire HTML prêt à coller sur un site :'),
+        h('pre', { class: 'fc-sample' }, `<form method="POST" action="${url()}">\n${(fields.length ? fields : ['nom', 'email', 'message']).map((f) => `  <input name="${f}" placeholder="${f}">`).join('\n')}\n  <button>Envoyer</button>\n</form>`),
+      ),
+      live ? null : h('p', { class: 'fc-muted small' }, 'Indique ci-dessus les informations qui vont arriver (ex. nom, email, message) : tu pourras les réutiliser dans les étapes suivantes.'),
+    );
+  }
+
   // ---------- Barre d'instructions + chaîne ----------
   render() {
     const c = this.ctx.city();
@@ -195,7 +230,7 @@ export class Linker {
     this.ctx.world.setLinking({ eligible: this.eligible(), chain });
     this.ctx.setDraft(chain);
     const n = this.steps.length;
-    const instruction = !n ? '① Clique sur le bâtiment qui donne le DÉPART (ceux qui brillent) : la Poste pour un mail reçu, la Mairie pour une heure précise…' : n === 1 ? '② Clique maintenant sur le bâtiment qui doit AGIR (tu peux cliquer sur le même).' : 'Ajoute une autre étape en cliquant sur un bâtiment, ou termine.';
+    const instruction = !n ? '① Clique sur le bâtiment qui donne le DÉPART (ceux qui brillent) : la Poste pour un mail reçu, la Mairie pour une heure précise, la Gare pour des données envoyées par une autre application (webhook)…' : n === 1 ? '② Clique maintenant sur le bâtiment qui doit AGIR (tu peux cliquer sur le même).' : 'Ajoute une autre étape en cliquant sur un bâtiment, ou termine.';
     const chips = this.steps.map((s, i) => {
       const b = c.buildings.find((x) => x.id === s.buildingId);
       const def = b && buildingDef(b.type, c.blueprints);
@@ -226,7 +261,9 @@ export class Linker {
     const draft = this.workflow();
     const sentence = describe(draft, c);
     const guest = Boolean(this.ctx.status().session?.guest);
-    const autoName = cap(`${say(this.steps[0].op)} → ${this.steps.slice(1).map((s) => s.label || say(s.op)).join(', ')}`).slice(0, 70);
+    const strip = (t) => t.replace(/\s*\(.*?\)\s*/g, ' ').trim();
+    let autoName = cap(`${strip(say(this.steps[0].op))} → ${this.steps.slice(1).map((s) => strip(s.label || say(s.op))).join(', ')}`);
+    if (autoName.length > 60) autoName = `${autoName.slice(0, 60).replace(/\s+\S*$/, '')}…`;
     const name = h('input', { class: 'fc-input', value: this.wf?.name || autoName });
     const result = h('div', { class: 'fc-lc-result' });
     const save = async (patch = {}) => {
@@ -240,6 +277,7 @@ export class Linker {
       h('header', { class: 'fc-lc-head' }, h('span', { class: 'em' }, '✨'), h('div', {}, h('b', {}, 'Ton automatisation est prête'), h('small', {}, 'Relis-la, essaie-la, puis mets-la en marche.')), h('button', { class: 'fc-icon-btn', onclick: () => this.card.classList.add('hidden') }, '✕')),
       h('ol', { class: 'fc-sentence' }, ...sentence.map((s) => h('li', {}, h('span', {}, s.emoji), ' ', s.text))),
       h('label', { class: 'fc-field' }, h('span', {}, 'Son nom'), name),
+      this.steps[0].op === 'webhook.in' ? this.webhookBox(this.steps[0].params, { live: true }) : null,
       needs.length ? h('p', { class: 'fc-alert' }, `🔌 À brancher pour le fonctionnement réel : ${[...new Set(needs.map((s) => s.name))].join(', ')} (Centrale électrique).`) : null,
       h('div', { class: 'fc-lc-actions' },
         h('button', { class: 'fc-btn block', onclick: async () => {
@@ -258,6 +296,16 @@ export class Linker {
           this.close();
         } }, '▶ Mettre en marche'),
         h('button', { class: 'fc-btn ghost block', onclick: async () => (await save()) && (toast('Enregistrée (à l’arrêt).', 'ok'), this.close()) }, 'Enregistrer sans la mettre en marche'),
+        this.steps[0].op === 'webhook.in' && this.ctx.api.webhook
+          ? h('button', { class: 'fc-btn block', title: 'Fait comme une autre application : envoie des données d’exemple à l’adresse de la Gare', onclick: async () => {
+              const wf = await save({ mode: guest ? 'sim' : 'real' });
+              if (!wf) return;
+              await guard(() => this.ctx.api.city.act({ type: 'workflow.toggle', id: wf.id, enabled: true }));
+              const data = Object.fromEntries(String(this.steps[0].params.fields || 'message').split(',').map((x) => x.trim()).filter(Boolean).map((f) => [f, `test ${f}`]));
+              const r = await guard(() => this.ctx.api.webhook.test(this.steps[0].params.path, data));
+              if (r) toast('📮 Appel de test reçu par la Gare : l’automatisation a démarré.', 'ok');
+            } }, '📮 Mettre en marche et envoyer un appel de test')
+          : null,
       ),
       result,
     );

@@ -31,6 +31,18 @@ Quelques exemples d'usage, selon le profil :
 
 Le mode **bac à sable** (par défaut) débloque tout gratuitement. Le **mode défi** (à la Mairie) ajoute crédits, niveaux et impôts quotidiens.
 
+## Webhooks (la Gare)
+
+Les webhooks sont la base des automatisations entre applications : une application en prévient une autre en appelant une adresse web. Dans Flowcity, c'est la **Gare**, utilisable en mode normal :
+
+- **Arrivées** — relie la Gare : « quand une autre application m'envoie des données ». Indique les informations attendues (ex. `nom, email, message`) : Flowcity te donne une **adresse à copier** (avec un code difficile à deviner), des exemples (données JSON, formulaire HTML prêt à coller) et un bouton **« Mettre en marche et envoyer un appel de test »**. Les informations reçues deviennent des étiquettes `[nom]`, `[email]`… pour les étapes suivantes. Les envois JSON et les formulaires de site sont acceptés ; un formulaire envoyé depuis un navigateur affiche « Merci, c'est bien envoyé ! ».
+- **Départs** — dans une automatisation, la Gare « envoie les données à une autre application » : colle l'adresse webhook de ton CRM, logiciel métier, Zapier, Make, n8n… Choisis les informations envoyées (`client = [Expéditeur]`) ou envoie tout, avec une clé secrète facultative.
+- **Qui peut appeler la Gare ?** (panneau de la Gare) : cet ordinateur seulement (par défaut), le réseau du bureau, ou Internet via une adresse publique (tunnel Cloudflare ou ngrok vers le port 47800). Flowcity doit rester ouvert pour recevoir les appels.
+
+## Apprendre ou travailler
+
+Au premier lancement (et à la Mairie), choisis **🎓 Apprendre** (missions de l'École, explications, récompenses) ou **💼 Professionnel** : sans missions ni célébrations, avec l'éditeur en schéma directement accessible (bouton 🧩 Schéma) et un profil **Entreprise & indépendants** (recettes : nouvelle commande → tableau + Slack, formulaire du site → CRM, paiement reçu → remerciement, relais entre deux outils).
+
 ## Habitants et rôles
 
 Chaque ville a un **Créateur** (celui qui l'a fondée : tous les droits, pour toujours). On y ajoute des personnes avec un rôle :
@@ -51,7 +63,7 @@ Pour entrer dans une ville où l'on a été ajouté : se connecter à Flowcity a
 
 | Catégorie | Bâtiments |
 |---|---|
-| 🏛️ Essentiels | **Mairie** (tableau de bord, tâches, journal, mode de jeu, sauvegarde), **École** (18 missions pour apprendre : déclencheur → action, variables, planification, conditions, IA, webhooks, gestion des erreurs, validation humaine…), **Centrale électrique** (tous tes comptes et clés, chiffrés), **Bibliothèque** (26 recettes prêtes à l'emploi, glossaire), **Ta maison** (tâches, bloc-notes) |
+| 🏛️ Essentiels | **Mairie** (tableau de bord, tâches, journal, mode de jeu, sauvegarde), **École** (18 missions pour apprendre : déclencheur → action, variables, planification, conditions, IA, webhooks, gestion des erreurs, validation humaine…), **Centrale électrique** (tous tes comptes et clés, chiffrés), **Bibliothèque** (30 recettes prêtes à l'emploi, glossaire), **Ta maison** (tâches, bloc-notes) |
 | ✉️ Communication | **La Poste** (Gmail : nouveau mail, recherche, envoi, réponse, brouillon, rangement dans des dossiers, pièces jointes), **Café des messageries** (Slack, Discord, Teams, e-mail), **Tour radio** (ntfy, Telegram, WhatsApp, SMS) |
 | 🗂️ Fichiers & organisation | **Archives** (Google Drive), **Cadastre** (Google Sheets), **Beffroi** (Google Agenda), **Bureau des projets** (Notion, Trello, Todoist, Airtable, Outlook) |
 | 🧠 Tri & intelligence | **Centre de tri** (conditions oui/non, filtres, dates, préparation de champs, limites, pauses, regroupement, formules, *demander mon accord*), **Laboratoire IA** (Claude, OpenAI, Mistral : demander, classer, extraire — et l'assistant Claude qui t'aide à construire tes automatisations) |

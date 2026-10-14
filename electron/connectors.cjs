@@ -24,6 +24,22 @@ async function fetchJson(url, opts = {}, label = 'Service') {
 }
 const postJson = (url, body, headers = {}, label) => fetchJson(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) }, label);
 
+// « nom = valeur » par ligne → objet (valeurs déjà remplacées par le moteur)
+function parseAssign(text) {
+  const out = {};
+  for (const line of String(text || '').split('\n')) {
+    const m = line.match(/^\s*([^=:]+?)\s*[=:]\s*(.*)$/);
+    if (m) out[m[1].trim()] = m[2];
+  }
+  return out;
+}
+// Exemple de données reçues (pour un essai à la main) à partir des informations attendues
+function webhookExample(p) {
+  const item = { receivedAt: new Date().toISOString(), query: {}, body: {} };
+  for (const f of String(p.fields || '').split(',').map((x) => x.trim()).filter(Boolean)) item.body[f] = item[f] = `(${f})`;
+  return item;
+}
+
 // Mini-lecteur RSS / Atom (sans dépendance) : titre, lien, date, résumé.
 function parseFeed(xml) {
   const items = [];
@@ -318,7 +334,17 @@ function createConnectors(ctx) {
     'n8n.webhook': async (p, item) => ({ response: await webhookPost(p.url, item, 'n8n') }),
     'make.webhook': async (p, item) => ({ response: await webhookPost(p.url, item, 'Make') }),
     'zapier.webhook': async (p, item) => ({ response: await webhookPost(p.url, item, 'Zapier') }),
-    'webhook.in': async () => [{ body: { exemple: 'Appelle l’adresse de la Gare pour envoyer de vraies données.' }, query: {}, receivedAt: new Date().toISOString() }],
+    'webhook.in': async (p) => [webhookExample(p)],
+    'webhook.send': async (p, item) => {
+      if (!/^https?:\/\//.test(p.url || '')) throw new Error('Adresse webhook invalide (elle commence par https://).');
+      const payload = String(p.fields || '').trim() ? parseAssign(p.fields) : item;
+      const clean = { ...payload };
+      delete clean.data; // pas de fichiers binaires dans un webhook
+      const r = await fetch(p.url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': UA, ...(p.secret ? { Authorization: `Bearer ${p.secret}` } : {}) }, body: JSON.stringify({ source: 'flowcity', sentAt: new Date().toISOString(), ...clean }) });
+      const text = await r.text();
+      if (!r.ok) throw new Error(`L’application a répondu ${r.status} : ${text.slice(0, 150)}`);
+      return { status: r.status, response: text.slice(0, 2000) };
+    },
     'http.check': async (p) => {
       if (!/^https?:\/\//.test(p.url || '')) throw new Error('Adresse invalide (http:// ou https://).');
       const t0 = Date.now();

@@ -242,7 +242,8 @@ export const BUILDINGS = {
     level: 3,
     unique: true,
     services: ['webhook'],
-    role: 'Les arrivées : une adresse web qui démarre ton automatisation quand un formulaire, un site ou un autre outil l’appelle.',
+    panel: 'gare',
+    role: 'Les webhooks, base des automatisations entre applications. ARRIVÉES : une adresse web que tes outils (formulaire, site, Stripe, Typeform, logiciel métier…) appellent pour démarrer une automatisation. DÉPARTS : envoyer des données à l’adresse webhook d’une autre application.',
     style: { shape: 'station', color: '#c9b79c', accent: '#2c3e50', floors: 1 },
   },
   tour_dev: {

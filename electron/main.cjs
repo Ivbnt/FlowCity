@@ -269,19 +269,50 @@ function setCursor(id, cursor) {
   store.set('cities', cities);
 }
 
-// ---------- Gare : serveur webhook local ----------
+// ---------- Gare : serveur webhook ----------
+// Par défaut, seule cette machine peut appeler la Gare (127.0.0.1). On peut l'ouvrir au réseau local
+// (bureau) ou indiquer une adresse publique (tunnel Cloudflare, ngrok…) pour les appels venant d'Internet.
 let hookServer = null;
+const os = require('os');
+function lanIp() {
+  for (const list of Object.values(os.networkInterfaces())) for (const a of list || []) if (a.family === 'IPv4' && !a.internal) return a.address;
+  return null;
+}
+function webhookBase() {
+  const s = store.get('settings');
+  const port = Number(s.webhookPort) || 47800;
+  if (s.webhookPublicUrl) return `${String(s.webhookPublicUrl).replace(/\/+$/, '')}/hook/`;
+  if (s.webhookLan && lanIp()) return `http://${lanIp()}:${port}/hook/`;
+  return `http://127.0.0.1:${port}/hook/`;
+}
+function parseBody(raw, type = '') {
+  if (!raw) return {};
+  if (/application\/x-www-form-urlencoded/.test(type)) return Object.fromEntries(new URLSearchParams(raw));
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { texte: raw };
+  }
+}
 function startHookServer() {
-  const port = Number(store.get('settings').webhookPort) || 47800;
+  if (hookServer) hookServer.close();
+  const s = store.get('settings');
+  const port = Number(s.webhookPort) || 47800;
   hookServer = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
     const m = url.pathname.match(/^\/hook\/([\w-]+)\/?$/);
+    const html = /text\/html/.test(req.headers.accept || '');
     const reply = (code, obj) => {
+      // Un formulaire de site envoyé depuis un navigateur reçoit une jolie page de confirmation
+      if (html) {
+        res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8' });
+        return res.end(`<body style="font-family:system-ui;display:grid;place-items:center;height:100vh;margin:0;background:#f4f7fb"><div style="text-align:center"><div style="font-size:56px">${obj.ok ? '✅' : '⚠️'}</div><h2>${obj.ok ? 'Merci, c’est bien envoyé !' : 'Envoi impossible'}</h2><p>${obj.ok ? '' : obj.error}</p></div></body>`);
+      }
       res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
       res.end(JSON.stringify(obj));
     };
     if (req.method === 'OPTIONS') {
-      res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET, POST' });
+      res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Allow-Methods': 'GET, POST' });
       return res.end();
     }
     if (!m || !user) return reply(404, { ok: false, error: 'Adresse inconnue' });
@@ -291,22 +322,21 @@ function startHookServer() {
       if (raw.length > 1e6) req.destroy();
     });
     req.on('end', () => {
-      let body = raw;
-      try {
-        body = raw ? JSON.parse(raw) : {};
-      } catch {
-        /* texte brut */
-      }
+      const body = parseBody(raw, req.headers['content-type']);
+      const query = Object.fromEntries(url.searchParams);
       const c = getCity();
       const hooks = c.workflows.filter((w) => w.enabled && w.nodes.some((n) => n.op === 'webhook.in' && String(n.params?.path || '').trim() === m[1]));
-      if (!hooks.length) return reply(404, { ok: false, error: `Aucun workflow actif sur « ${m[1]} »` });
-      const item = { body, query: Object.fromEntries(url.searchParams), receivedAt: new Date().toISOString() };
+      send('hook:received', { path: m[1], at: new Date().toISOString(), count: hooks.length });
+      if (!hooks.length) return reply(404, { ok: false, error: `Aucune automatisation en marche sur « ${m[1]} »` });
+      // Les informations reçues sont directement utilisables : [nom], [email]… (et aussi body / query)
+      const flat = body && typeof body === 'object' && !Array.isArray(body) ? body : { texte: body };
+      const item = { ...query, ...flat, body, query, receivedAt: new Date().toISOString() };
       for (const wf of hooks) execute(wf, { source: 'gare', triggerItems: [item] }).catch((e) => send('toast', { kind: 'error', text: `${wf.name} : ${e.message}` }));
-      reply(200, { ok: true, workflows: hooks.map((w) => w.name) });
+      reply(200, { ok: true, automatisations: hooks.map((w) => w.name) });
     });
   });
-  hookServer.on('error', (e) => console.error('Gare indisponible :', e.message));
-  hookServer.listen(port, '127.0.0.1');
+  hookServer.on('error', (e) => send('toast', { kind: 'error', text: `Gare indisponible (port ${port}) : ${e.message}` }));
+  hookServer.listen(port, s.webhookLan ? '0.0.0.0' : '127.0.0.1');
 }
 
 // ---------- IPC ----------
@@ -318,7 +348,11 @@ function status() {
     googleClientId: s.googleClientId,
     googleHasSecret: store.hasSecret('googleClientSecret'),
     model: s.model,
-    webhookBase: `http://127.0.0.1:${Number(s.webhookPort) || 47800}/hook/`,
+    webhookBase: webhookBase(),
+    webhookLocal: `http://127.0.0.1:${Number(s.webhookPort) || 47800}/hook/`,
+    webhookLan: Boolean(s.webhookLan),
+    webhookPublicUrl: s.webhookPublicUrl || '',
+    lanIp: lanIp(),
     encrypted: store.encrypted(),
     connections: connections(),
     credentials: user ? credentialStatus() : {},
@@ -460,8 +494,26 @@ function registerIpc() {
     const s = store.get('settings');
     if (patch.model) s.model = String(patch.model);
     if (patch.webhookPort) s.webhookPort = Math.max(1024, Math.min(65535, Number(patch.webhookPort) || 47800));
+    const restart = patch.webhookLan !== undefined || patch.webhookPort;
+    if (patch.webhookLan !== undefined || patch.webhookPublicUrl !== undefined) requirePerm('settings');
+    if (patch.webhookLan !== undefined) s.webhookLan = Boolean(patch.webhookLan);
+    if (patch.webhookPublicUrl !== undefined) {
+      const u = String(patch.webhookPublicUrl || '').trim();
+      if (u && !/^https:\/\//.test(u)) throw new Error('L’adresse publique doit commencer par https://');
+      s.webhookPublicUrl = u;
+    }
     store.set('settings', s);
+    if (restart) startHookServer();
     return status();
+  });
+  // Envoie un appel de test à la Gare (comme le ferait une autre application)
+  h('webhook:test', async (path, data) => {
+    requirePerm('run');
+    const port = Number(store.get('settings').webhookPort) || 47800;
+    const r = await fetch(`http://127.0.0.1:${port}/hook/${encodeURIComponent(path)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || `Réponse ${r.status}`);
+    return j;
   });
   h('open:url', (url) => {
     if (/^(https:\/\/|mailto:)/.test(String(url))) shell.openExternal(String(url));

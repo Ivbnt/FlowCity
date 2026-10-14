@@ -75,7 +75,14 @@ export function mockCall(op, params = {}, item = {}) {
       for (const f of String(params.fields || '').split(',').map((s) => s.trim()).filter(Boolean)) out[f] = `(${f})`;
       return out;
     }
-    case 'webhook.in': return [{ body: { nom: 'Visiteur', message: 'Bonjour depuis le formulaire !' }, query: {}, receivedAt: b.$now }];
+    case 'webhook.in': {
+      // Données d'exemple à partir des informations attendues (ou un petit formulaire de contact)
+      const fields = String(params.fields || 'nom, email, message').split(',').map((x) => x.trim()).filter(Boolean);
+      const sample = { nom: 'Léa Martin', email: 'lea@exemple.fr', message: 'Bonjour, je voudrais un devis.', telephone: '06 12 34 56 78', montant: '120', commande: 'C-1042' };
+      const body = Object.fromEntries(fields.map((f) => [f, sample[f.toLowerCase()] ?? `(${f})`]));
+      return [{ ...body, body, query: {}, receivedAt: b.$now }];
+    }
+    case 'webhook.send': return { status: 200, response: '{"ok":true}' };
     case 'http.check': return { up: Math.random() > 0.2 ? 'oui' : 'non', status: 200, ms: 120 + Math.round(Math.random() * 200), checkedAt: b.$now };
     case 'http.request': return { status: 200, response: '{"ok":true}', data: { ok: true } };
     case 'rss.newItem':
