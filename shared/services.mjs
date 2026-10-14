@@ -1,4 +1,4 @@
-// Catalogue des services de FlowCity : chaque service est un « fournisseur » (Gmail, Slack, n8n…)
+// Catalogue des services de Flowcity : chaque service est un « fournisseur » (Gmail, Slack, n8n…)
 // qui propose des déclencheurs (ce qui démarre un workflow) et des actions (ce que fait une étape).
 // Ce fichier est partagé entre le processus principal (exécution réelle) et l'interface (éditeur, simulation).
 //
@@ -8,7 +8,7 @@
 //   desc     explication pédagogique (ce que fait l'étape, en une phrase)
 //   fields   paramètres à remplir ({key, label, type: text|textarea|number|select|bool, options, placeholder, required})
 //   outputs  champs ajoutés à l'élément qui continue le workflow (pour l'aide à la saisie {{champ}})
-//   real     true si FlowCity sait l'exécuter pour de vrai (sinon : simulation seulement)
+//   real     true si Flowcity sait l'exécuter pour de vrai (sinon : simulation seulement)
 
 const T = (key, label, extra = {}) => ({ key, label, type: 'text', ...extra });
 const TA = (key, label, extra = {}) => ({ key, label, type: 'textarea', ...extra });
@@ -33,7 +33,7 @@ export const CATEGORIES = {
 export const SERVICES = {
   // ---------------- Cœur de la ville (sans compte) ----------------
   flow: {
-    name: 'FlowCity',
+    name: 'Flowcity',
     icon: '🏙️',
     category: 'core',
     auth: { kind: 'none' },
@@ -81,7 +81,7 @@ export const SERVICES = {
         kind: 'action',
         label: 'Notification sur l’ordinateur',
         desc: 'Affiche une notification Windows / macOS (et une bulle dans la ville).',
-        fields: [T('title', 'Titre', { default: 'FlowCity' }), TA('text', 'Message', { required: true })],
+        fields: [T('title', 'Titre', { default: 'Flowcity' }), TA('text', 'Message', { required: true })],
         outputs: [],
         real: true,
         n8n: { type: 'n8n-nodes-base.noOp' },
@@ -217,7 +217,7 @@ export const SERVICES = {
     category: 'messaging',
     auth: { kind: 'fields', fields: [{ key: 'webhook', label: 'URL du webhook', secret: true, placeholder: 'https://discord.com/api/webhooks/…' }], help: 'Paramètres du salon → Intégrations → Webhooks → Nouveau webhook → Copier l’URL.' },
     desc: 'Messages dans un salon Discord.',
-    ops: { 'discord.send': { kind: 'action', label: 'Envoyer un message', desc: 'Poste un message dans le salon.', fields: [TA('text', 'Message', { required: true }), T('username', 'Nom affiché', { default: 'FlowCity' })], outputs: [], real: true, write: true } },
+    ops: { 'discord.send': { kind: 'action', label: 'Envoyer un message', desc: 'Poste un message dans le salon.', fields: [TA('text', 'Message', { required: true }), T('username', 'Nom affiché', { default: 'Flowcity' })], outputs: [], real: true, write: true } },
   },
   telegram: {
     name: 'Telegram',
@@ -265,7 +265,7 @@ export const SERVICES = {
     category: 'messaging',
     auth: { kind: 'fields', fields: [{ key: 'topic', label: 'Sujet (topic)', placeholder: 'ma-ville-secrete-1234' }, { key: 'server', label: 'Serveur', placeholder: 'https://ntfy.sh' }], help: 'Installe l’appli ntfy sur ton téléphone, abonne-toi à un sujet au nom difficile à deviner. Gratuit, sans compte.' },
     desc: 'Notifications push gratuites sur ton téléphone, sans compte.',
-    ops: { 'ntfy.send': { kind: 'action', label: 'Notifier mon téléphone', desc: 'Envoie une notification push à l’appli ntfy.', fields: [T('title', 'Titre', { default: 'FlowCity' }), TA('text', 'Message', { required: true }), SEL('priority', 'Priorité', [['3', 'normale'], ['4', 'haute'], ['5', 'urgente'], ['2', 'basse']], { default: '3' })], outputs: [], real: true, write: true } },
+    ops: { 'ntfy.send': { kind: 'action', label: 'Notifier mon téléphone', desc: 'Envoie une notification push à l’appli ntfy.', fields: [T('title', 'Titre', { default: 'Flowcity' }), TA('text', 'Message', { required: true }), SEL('priority', 'Priorité', [['3', 'normale'], ['4', 'haute'], ['5', 'urgente'], ['2', 'basse']], { default: '3' })], outputs: [], real: true, write: true } },
   },
 
   // ---------------- Organisation ----------------
@@ -449,7 +449,7 @@ export const SERVICES = {
     icon: '📣',
     category: 'social',
     auth: { kind: 'none' },
-    desc: 'Les réseaux demandent une validation de leur côté : FlowCity prépare la publication et l’envoie via n8n, Make ou Buffer.',
+    desc: 'Les réseaux demandent une validation de leur côté : Flowcity prépare la publication et l’envoie via n8n, Make ou Buffer.',
     ops: { 'social.post': { kind: 'action', label: 'Préparer une publication', desc: 'Prépare un post (texte + lien image) et l’envoie au webhook de ton outil de publication.', fields: [SEL('network', 'Réseau', [['instagram', 'Instagram'], ['linkedin', 'LinkedIn'], ['x', 'X / Twitter'], ['tiktok', 'TikTok'], ['facebook', 'Facebook']], { default: 'instagram' }), TA('text', 'Texte', { required: true }), T('image', 'Lien de l’image'), T('webhook', 'Webhook de publication (n8n / Make / Buffer)')], outputs: ['prepared'], real: true, write: true } },
   },
   stripe: {

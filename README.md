@@ -1,8 +1,10 @@
-# FlowCity — construis ta ville, automatise ta vie
+<p align="center"><img src="build/icon.png" width="120" alt="Flowcity"></p>
 
-FlowCity est un **jeu bac à sable façon SimCity** pour apprendre à créer des **automatisations (workflows)** et organiser sa vie numérique pour de vrai.
+# Flowcity — construis ta ville, automatise ta vie
 
-Au lancement, tu te connectes avec ton **compte Google** et la carte est **vide**. C'est toi qui construis. Chaque bâtiment branche ta ville sur un outil réel (la Poste = Gmail, les Archives = Google Drive, le Beffroi = Google Agenda, la Tour radio = notifications sur ton téléphone…). Les routes relient les bâtiments : quand un workflow est actif, **ses données circulent en flux lumineux** d'un bâtiment à l'autre.
+Flowcity est un **jeu bac à sable façon SimCity** pour apprendre à créer des **automatisations (workflows)** et organiser sa vie numérique pour de vrai.
+
+Au lancement, tu te connectes avec ton **compte Google** et la carte est **vide** : rien n'est construit à ta place, tu bâtis tout de zéro. Chaque bâtiment branche ta ville sur un outil réel (la Poste = Gmail, les Archives = Google Drive, le Beffroi = Google Agenda, la Tour radio = notifications sur ton téléphone…). Les routes relient les bâtiments : quand une automatisation est en marche, **ses données circulent en flux lumineux** d'un bâtiment à l'autre.
 
 Quelques exemples d'usage, selon le profil :
 - **Organiser ses mails** : ranger les newsletters dans un dossier, alerte sur ton téléphone quand un proche écrit, factures enregistrées dans le Drive.
@@ -15,10 +17,15 @@ Quelques exemples d'usage, selon le profil :
 ## Comment on joue
 
 1. **Connexion Google** : donne d'emblée accès à Gmail, Drive, Agenda et Sheets (sans jamais partager ton mot de passe). Tu peux aussi « visiter sans compte » : tout se fait alors en simulation.
-2. **Profil** : au premier lancement, choisis ce qui t'amène (mails, emploi, RH, informatique, réseaux, vie perso). FlowCity peut construire une ville de départ avec les bons bâtiments, ou te laisser partir d'une carte vide.
+2. **Carte vide** : choisis (si tu veux) ce qui t'intéresse — mails, emploi, RH, informatique, réseaux, vie perso — et les bâtiments utiles sont marqués d'une ★. Puis construis : la Mairie d'abord, puis ce que tu veux.
 3. **Construire** (barre du bas) : bâtiments classés par usage — Essentiels, Communication, Fichiers & organisation, Tri & intelligence, Web & réseaux, Vie réelle, Sécurité & suivi, Sur mesure, Décor. Clique, pose sur la carte (R pour pivoter), trace des routes en clic-glissé, démolis avec le bulldozer.
-4. **Workflows** (bouton en haut) : un éditeur visuel. Choisis un *déclencheur* (bouton, horloge, nouveau mail, nouveau fichier, webhook, flux RSS…), ajoute des *actions*, relie-les par des flèches, règle chaque étape avec des `{{variables}}`. Teste en **🧪 simulation** (données d'exemple), puis passe en **⚡ réel** et **active** le workflow : il tourne tout seul.
-5. **Balade** : visite ta ville à pied (ZQSD / WASD, souris, Maj pour courir) et entre dans un bâtiment avec **E**. Touche **V** pour passer de la vue d'ensemble à la balade.
+4. **Relier des bâtiments** (bouton en haut) : c'est comme ça qu'on crée une automatisation, sans schéma ni jargon.
+   - clique sur le bâtiment qui donne le **départ** (il brille) : la Poste → « quand je reçois un mail », la Mairie → « quand c'est l'heure »… ;
+   - clique sur le bâtiment qui doit **agir** : la Tour radio → « m'envoie une notification sur mon téléphone », les Archives → « enregistre le fichier »… ;
+   - une bulle pose des questions simples (« De qui ? », « Avec quel mot ? », « Quel message ? »). Les informations de l'étape d'avant s'insèrent d'un clic, comme `[Expéditeur]` ou `[Objet]` ;
+   - **Terminer** → l'automatisation est racontée en phrases (« Quand je reçois un mail de maman → la Tour radio m'envoie une notification »). On peut l'**essayer** sans rien envoyer, puis la **mettre en marche**. Un ruban lumineux relie alors les bâtiments : les données y circulent.
+5. **Mes automatisations** : la liste, avec interrupteur marche/arrêt, Essayer, Lancer maintenant, Modifier. Un **mode avancé** (éditeur en schéma, avec aiguillages et formules) reste disponible pour les curieux, mais il n'est jamais nécessaire.
+6. **Balade** : visite ta ville à pied (ZQSD / WASD, souris, Maj pour courir) et entre dans un bâtiment avec **E**. Touche **V** pour passer de la vue d'ensemble à la balade. Pas d'armes : on se promène.
 
 Le mode **bac à sable** (par défaut) débloque tout gratuitement. Le **mode défi** (à la Mairie) ajoute crédits, niveaux et impôts quotidiens.
 
@@ -29,15 +36,15 @@ Le mode **bac à sable** (par défaut) débloque tout gratuitement. Le **mode d�
 | 🏛️ Essentiels | **Mairie** (tableau de bord, tâches, journal, mode de jeu, sauvegarde), **École** (18 missions pour apprendre : déclencheur → action, variables, planification, conditions, IA, webhooks, gestion des erreurs, validation humaine…), **Centrale électrique** (tous tes comptes et clés, chiffrés), **Bibliothèque** (26 recettes prêtes à l'emploi, glossaire), **Ta maison** (tâches, bloc-notes) |
 | ✉️ Communication | **La Poste** (Gmail : nouveau mail, recherche, envoi, réponse, brouillon, rangement dans des dossiers, pièces jointes), **Café des messageries** (Slack, Discord, Teams, e-mail), **Tour radio** (ntfy, Telegram, WhatsApp, SMS) |
 | 🗂️ Fichiers & organisation | **Archives** (Google Drive), **Cadastre** (Google Sheets), **Beffroi** (Google Agenda), **Bureau des projets** (Notion, Trello, Todoist, Airtable, Outlook) |
-| 🧠 Tri & intelligence | **Centre de tri** (conditions oui/non, filtres, dates, préparation de champs, limites, pauses, regroupement, formules, *demander mon accord*), **Laboratoire IA** (Claude, OpenAI, Mistral : demander, classer, extraire — et l'assistant Claude qui t'aide à construire tes workflows) |
+| 🧠 Tri & intelligence | **Centre de tri** (conditions oui/non, filtres, dates, préparation de champs, limites, pauses, regroupement, formules, *demander mon accord*), **Laboratoire IA** (Claude, OpenAI, Mistral : demander, classer, extraire — et l'assistant Claude qui t'aide à construire tes automatisations) |
 | 🌐 Web & réseaux | **Gare** (webhooks entrants), **Tour des développeurs** (n'importe quelle API, vérification de site, GitHub, RSS), **Studio média** (YouTube, préparation de posts pour les réseaux, Spotify), **Usine** (envoyer des données à n8n, Make, Zapier) |
 | 🏡 Vie réelle | **Maison connectée** (Home Assistant, météo), **Banque** (Stripe) |
-| 🛡️ Sécurité & suivi | **Caserne** (erreurs expliquées, relance, alerte en cas d'erreur), **Hôpital** (bilan de santé des connexions et des workflows), **Commissariat** (règles de prudence, workflows qui agissent pour toi), **Observatoire** (statistiques, temps gagné) |
-| 🛠️ Sur mesure | **Atelier modulable** (choisis la fonction et la couleur), **Bureau d'architecte** (crée tes propres bâtiments : nom, emoji, forme, couleur, étages, taille, et leur fonction — une action préréglée, un appel d'API ou un workflow entier) |
+| 🛡️ Sécurité & suivi | **Caserne** (erreurs expliquées, relance, alerte en cas d'erreur), **Hôpital** (bilan de santé des connexions et des automatisations), **Commissariat** (règles de prudence, automatisations qui agissent pour toi), **Observatoire** (statistiques, temps gagné) |
+| 🛠️ Sur mesure | **Atelier modulable** (choisis la fonction et la couleur), **Bureau d'architecte** (crée tes propres bâtiments : nom, emoji, forme, couleur, étages, taille, et leur fonction — une action préréglée, un appel d'API ou une automatisation entière ; on le relie ensuite comme les autres) |
 
 ## Lancer l'application
 
-**Windows** : installe [Node.js LTS](https://nodejs.org/fr), télécharge le projet (bouton vert **Code** → **Download ZIP**), puis double-clique sur **`Lancer FlowCity.bat`**. La première fois, l'installation prend 2 à 5 minutes. Pour fabriquer un `.exe` (installeur ou version portable) : **`Creer l'exe Windows.bat`**.
+**Windows** : installe [Node.js LTS](https://nodejs.org/fr), télécharge le projet (bouton vert **Code** → **Download ZIP**), puis double-clique sur **`Lancer Flowcity.bat`**. La première fois, l'installation prend 2 à 5 minutes. Pour fabriquer un `.exe` (installeur ou version portable) : **`Creer l'exe Windows.bat`**.
 
 **En ligne de commande** (Windows, macOS, Linux) :
 
@@ -50,7 +57,7 @@ npm run preview    # aperçu dans un navigateur (tout en simulation)
 npm run dist:win   # ou dist:mac / dist:linux
 ```
 
-## Relier FlowCity à Google (une seule fois)
+## Relier Flowcity à Google (une seule fois)
 
 La connexion Google demande un identifiant d'application (gratuit) :
 
@@ -58,7 +65,7 @@ La connexion Google demande un identifiant d'application (gratuit) :
 2. *API et services → Bibliothèque* : active **Gmail API**, **Google Drive API**, **Google Calendar API** et **Google Sheets API**.
 3. *Écran de consentement OAuth* : type **Externe**, puis ajoute les adresses des utilisateurs dans *Utilisateurs test* (tant que l'application n'est pas validée par Google).
 4. *Identifiants → Créer des identifiants → ID client OAuth* → type **Application de bureau**.
-5. Colle l'ID client et le code secret dans l'écran de connexion de FlowCity.
+5. Colle l'ID client et le code secret dans l'écran de connexion de Flowcity.
 
 Pour une équipe ou une école, copie `flowcity.config.example.json` en `flowcity.config.json` (à côté de l'application) avec ces deux valeurs : personne n'aura à le faire.
 
@@ -66,10 +73,10 @@ Les autres services se branchent à la **Centrale électrique**, avec l'aide pas
 
 ## Comment ça marche
 
-- Un **workflow** est une suite d'étapes. Le déclencheur produit des *éléments* (un mail, une ligne, un fichier…) ; chaque étape les traite un par un, et ses résultats s'ajoutent à l'élément : après « Demander à Claude », tu peux utiliser à la fois `{{subject}}` (du mail) et `{{answer}}` (de l'IA).
+- Une **automatisation** (un « workflow ») est une suite d'étapes. Le déclencheur produit des *éléments* (un mail, une ligne, un fichier…) ; chaque étape les traite un par un, et ses résultats s'ajoutent à l'élément : après « Demander à Claude », tu peux utiliser à la fois `[Objet]` (du mail) et `[Réponse de l’IA]`.
 - Les déclencheurs « nouveau mail », « nouveau fichier », « événement qui approche », « nouvel article » vérifient régulièrement s'il y a du nouveau (5 à 30 minutes) et ne traitent jamais deux fois le même élément.
-- La **Gare** écoute sur `http://127.0.0.1:47800/hook/<nom>` : un formulaire ou un autre outil de ton ordinateur peut démarrer un workflow.
-- Les workflows tournent quand FlowCity est ouvert.
+- La **Gare** écoute sur `http://127.0.0.1:47800/hook/<nom>` : un formulaire ou un autre outil de ton ordinateur peut démarrer une automatisation.
+- Les automatisations tournent quand Flowcity est ouvert.
 
 ## Architecture
 
@@ -83,6 +90,7 @@ electron/
   preload.cjs     pont sécurisé vers l'interface
 shared/           (utilisé par l'application ET l'aperçu navigateur)
   services.mjs    catalogue des services : déclencheurs, actions, champs
+  simple.mjs      mode simple : phrases, étiquettes [Objet], champs simplifiés
   buildings.mjs   bâtiments, catégories, niveaux
   engine.mjs      moteur d'exécution, variables, conditions, vérifications
   city.mjs        état de la ville et toutes les actions (construction, routes, workflows…)
@@ -92,7 +100,9 @@ shared/           (utilisé par l'application ET l'aperçu navigateur)
 src/
   world.js        monde 3D (Three.js) : terrain, construction, routes, flux, balade à pied
   models.js       modèles 3D des bâtiments
-  editor.js       éditeur visuel des workflows
+  linker.js       « Relier des bâtiments » : création d'automatisations dans la ville
+  editor.js       éditeur en schéma (mode avancé, facultatif)
+  logo.js         logo Flowcity
   panels.js       panneaux des bâtiments
   main.js         interface du jeu
   api.js          accès au processus principal (ou mode navigateur)

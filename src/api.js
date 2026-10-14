@@ -79,7 +79,7 @@ function browserApi() {
     const adapter = {
       call: async (op, params, item) => {
         await new Promise((r) => setTimeout(r, 350 + Math.random() * 350));
-        if (op === 'flow.notify') emit('toast', { kind: 'ok', text: `🔔 ${params.title || 'FlowCity'} — ${params.text || ''}` });
+        if (op === 'flow.notify') emit('toast', { kind: 'ok', text: `🔔 ${params.title || 'Flowcity'} — ${params.text || ''}` });
         if (op === 'flow.task') act({ type: 'task.add', title: params.title, priority: Number(params.priority) || 2, due: params.due || null, source: wf.name });
         if (op === 'flow.note') act({ type: 'journal', text: `📝 ${params.text}` });
         if (op === 'flow.subflow') {

@@ -1,4 +1,4 @@
-// FlowCity — interface du jeu : connexion, barre de construction, panneaux des bâtiments,
+// Flowcity — interface du jeu : connexion, barre de construction, panneaux des bâtiments,
 // atelier des workflows, flux animés dans la ville, balade à pied.
 import '@fontsource-variable/inter';
 import './styles.css';
@@ -6,14 +6,17 @@ import { api } from './api.js';
 import { World } from './world.js';
 import { Editor } from './editor.js';
 import { renderPanel, chatBubble } from './panels.js';
-import { h, $, put, toast, modal, guard, fmtMinutes } from './dom.js';
+import { Linker } from './linker.js';
+import { describe, isLinear } from '../shared/simple.mjs';
+import { logoSvg } from './logo.js';
+import { h, $, put, toast, modal, guard, confirmBox, fmtMinutes } from './dom.js';
 import { BUILDINGS, BUILDING_CATEGORIES, buildingDef, levelOf, levelProgress, providersOf } from '../shared/buildings.mjs';
 import { canPlace, savedMinutes } from '../shared/city.mjs';
 import { MISSIONS, missionStatus } from '../shared/missions.mjs';
 import { PROFILES } from '../shared/library.mjs';
 import { reachable } from '../shared/engine.mjs';
 
-const state = { status: null, city: null, world: null, selected: null, selectedArg: null, category: 'essentiels', tool: { kind: 'select' }, editor: null, runs: new Map(), chat: { history: [], log: null } };
+const state = { draft: null, view: null, status: null, city: null, world: null, selected: null, selectedArg: null, category: 'essentiels', tool: { kind: 'select' }, editor: null, runs: new Map(), chat: { history: [], log: null } };
 const city = () => state.city;
 const app = $('#app');
 
@@ -53,9 +56,9 @@ function showLogin() {
   const clientId = h('input', { class: 'fc-input', placeholder: 'xxxxxxxx.apps.googleusercontent.com' });
   const secret = h('input', { class: 'fc-input', type: 'password', placeholder: 'GOCSPX-…' });
   const setup = h('details', { class: 'fc-setup', open: needsClient },
-    h('summary', {}, needsClient ? '⚙️ Première installation : relier FlowCity à Google (5 minutes, une seule fois)' : '⚙️ Identifiant Google de l’application'),
+    h('summary', {}, needsClient ? '⚙️ Première installation : relier Flowcity à Google (5 minutes, une seule fois)' : '⚙️ Identifiant Google de l’application'),
     h('ol', {},
-      h('li', {}, 'Ouvre ', h('a', { href: '#', onclick: (e) => (e.preventDefault(), api.openUrl('https://console.cloud.google.com/projectcreate')) }, 'console.cloud.google.com'), ' et crée un projet (nom : FlowCity).'),
+      h('li', {}, 'Ouvre ', h('a', { href: '#', onclick: (e) => (e.preventDefault(), api.openUrl('https://console.cloud.google.com/projectcreate')) }, 'console.cloud.google.com'), ' et crée un projet (nom : Flowcity).'),
       h('li', {}, 'Menu « API et services » → « Bibliothèque » : active Gmail API, Google Drive API, Google Calendar API et Google Sheets API.'),
       h('li', {}, '« Écran de consentement OAuth » : type Externe, puis ajoute ton adresse dans « Utilisateurs test ».'),
       h('li', {}, '« Identifiants » → « Créer des identifiants » → « ID client OAuth » → type « Application de bureau ».'),
@@ -72,10 +75,10 @@ function showLogin() {
     h('p', { class: 'fc-muted small' }, 'Astuce pour une équipe : place un fichier flowcity.config.json { "googleClientId": "…", "googleClientSecret": "…" } à côté de l’application, et personne n’aura à le faire.'),
   );
   const card = h('div', { class: 'fc-login-card' },
-    h('div', { class: 'fc-logo big' }, h('span', {}, '🏙️')),
-    h('h1', {}, 'FlowCity'),
+    logoSvg(92),
+    h('h1', { class: 'fc-wordmark big' }, h('span', { class: 'a' }, 'Flow'), h('span', { class: 'b' }, 'city')),
     h('p', { class: 'tag' }, 'Construis ta ville, automatise ta vie.'),
-    h('p', { class: 'fc-muted' }, 'Une carte vide, et tout à bâtir : chaque bâtiment branche ta ville sur un outil réel (Gmail, Drive, Slack, Notion, IA…), et les routes transportent tes données d’un bâtiment à l’autre. C’est comme ça qu’on apprend à créer des workflows.'),
+    h('p', { class: 'fc-muted' }, 'Une carte vide, et tout à bâtir : chaque bâtiment branche ta ville sur un outil réel (Gmail, Drive, Slack, Notion, IA…), et pour automatiser, il suffit de relier les bâtiments entre eux : « quand je reçois un mail… alors préviens-moi ».'),
     btn,
     st.demo ? h('p', { class: 'fc-muted small' }, 'Aperçu navigateur : la connexion Google est simulée.') : setup,
     err,
@@ -105,7 +108,7 @@ async function start() {
       const def = buildingDef(b?.type, city().blueprints);
       if (b) guard(() => api.city.act({ type: 'remove', id }), `${def?.name || 'Bâtiment'} démoli`);
     },
-    onSelect: (id) => select(id),
+    onSelect: (id) => (state.linker?.active ? id && state.linker.click(id) : select(id)),
     onHover: (id) => {
       const b = id && city().buildings.find((x) => x.id === id);
       $('#fc-stage').title = b ? buildingDef(b.type, city().blueprints)?.name || '' : '';
@@ -122,9 +125,22 @@ async function start() {
       renderTop();
     },
   });
+  state.linker = new Linker({
+    api,
+    city,
+    world: state.world,
+    status: () => state.status,
+    setDraft: (chain) => {
+      state.draft = chain;
+      state.world.setFlows(flowSpec());
+    },
+    onClose: () => renderTop(),
+    openAdvanced: (id) => openEditor(id),
+  });
   api.city.onChange((c) => {
     state.city = c;
     refresh();
+    if (state.linker.active) state.linker.render();
   });
   api.city.onMissions((ids) => celebrate(ids));
   api.wf.onStart((r) => state.runs.set(r.runId, { workflowId: r.workflowId, nodeBuilding: new Map(), color: colorOf(r.workflowId) }));
@@ -164,16 +180,17 @@ function renderTop() {
   const lp = levelProgress(c.xp);
   const chips = [
     h('span', { class: 'fc-chip-stat', title: 'Temps gagné par tes automatisations réelles' }, '⏱️ ', fmtMinutes(savedMinutes(c))),
-    h('span', { class: 'fc-chip-stat', title: 'Workflows actifs (ils tournent tout seuls)' }, '⚙️ ', c.workflows.filter((w) => w.enabled).length, ' actifs'),
+    h('span', { class: 'fc-chip-stat', title: 'Automatisations en marche (elles tournent toutes seules)' }, '⚙️ ', c.workflows.filter((w) => w.enabled).length, ' en marche'),
     h('span', { class: 'fc-chip-stat', title: 'Services branchés à la Centrale' }, '🔌 ', c.connections.length),
   ];
   if (!c.sandbox) chips.unshift(h('span', { class: 'fc-chip-stat gold', title: 'Crédits' }, '🪙 ', c.credits), h('span', { class: 'fc-chip-stat lvl', title: `${c.xp} XP` }, `Niv. ${lp.level} · ${lp.name}`, h('i', { style: { width: `${lp.pct * 100}%` } })));
   else chips.unshift(h('span', { class: 'fc-chip-stat', title: 'Mode bac à sable : tout est débloqué (change-le à la Mairie)' }, '🧱 Bac à sable'));
   put($('#fc-top'), 
-    h('div', { class: 'fc-brand' }, h('div', { class: 'fc-logo' }, '🏙️'), h('div', {}, h('b', {}, c.name), h('small', {}, st.session?.guest ? 'visite · simulation' : 'FlowCity'))),
+    h('div', { class: 'fc-brand' }, logoSvg(36), h('div', {}, h('b', {}, c.name), h('small', {}, st.session?.guest ? 'Flowcity · visite' : 'Flowcity'))),
     h('div', { class: 'fc-stats-row' }, ...chips),
     h('div', { class: 'fc-top-actions' },
-      h('button', { class: 'fc-btn primary', onclick: () => openEditor() }, '⚙️ Workflows'),
+      h('button', { class: 'fc-btn primary', title: 'Créer une automatisation en cliquant sur tes bâtiments', onclick: () => startLinking() }, '🔗 Relier des bâtiments'),
+      h('button', { class: 'fc-btn', onclick: () => showAutomations() }, '📋 Mes automatisations'),
       h('button', { class: `fc-btn ${state.world?.mode === 'pov' ? 'on' : ''}`, title: 'Se balader à pied dans la ville (V)', onclick: () => state.world.setMode(state.world.mode === 'pov' ? 'orbit' : 'pov') }, state.world?.mode === 'pov' ? '🗺️ Vue d’ensemble' : '🚶 Balade'),
       h('button', { class: 'fc-btn ghost', title: 'Jour / nuit', onclick: () => state.world.setNight(state.world.nightTarget > 0.5 ? 0 : 1) }, state.world?.nightTarget > 0.5 ? '☀️' : '🌙'),
       h('button', { class: 'fc-avatar-btn', title: st.session?.email || '', onclick: () => openPlace('mairie') }, st.session?.picture ? h('img', { src: st.session.picture, alt: '' }) : '👤'),
@@ -276,6 +293,8 @@ function ctxObj() {
     chat: state.chat,
     select,
     openEditor,
+    startLinking,
+    linkable: (b) => (state.linker.opsOf(b, 'trigger').length ? 'trigger' : state.linker.opsOf(b, 'action').length ? 'action' : null),
     openPlace,
     startBuild,
     chooseProfile,
@@ -292,12 +311,19 @@ function ctxObj() {
   };
 }
 function select(id, arg) {
+  if (id) state.view = null;
+  if (!id && state.view === 'automations' && state.selected === null) state.view = null;
   state.selected = id;
   state.selectedArg = arg ?? null;
   renderSelected();
 }
 function renderSelected() {
   const panel = $('#fc-panel');
+  if (state.view === 'automations' && !state.selected) {
+    put(panel, ...automationsPanel());
+    panel.classList.remove('hidden');
+    return;
+  }
   const b = state.selected && city().buildings.find((x) => x.id === state.selected);
   if (!b) {
     panel.classList.add('hidden');
@@ -325,7 +351,55 @@ function openPlace(type, arg) {
   select(b.id, arg);
 }
 
-// ---------- Atelier des workflows ----------
+// ---------- Relier des bâtiments (mode simple) ----------
+function startLinking(opts = {}) {
+  const c = city();
+  if (!c.buildings.some((b) => b.type === 'mairie')) return toast('Construis d’abord ta Mairie (onglet Essentiels) : elle sert d’horloge et de bouton de départ.', 'warn');
+  if (state.world.mode === 'pov') state.world.setMode('orbit');
+  if (state.editor) state.editor.close();
+  setTool({ kind: 'select' });
+  state.view = null;
+  select(null);
+  state.linker.start(opts);
+}
+function showAutomations() {
+  if (state.linker.active) state.linker.close();
+  state.selected = null;
+  state.view = 'automations';
+  renderSelected();
+}
+function automationsPanel() {
+  const c = city();
+  const guest = Boolean(state.status.session?.guest);
+  const list = c.workflows.map((w) => {
+    const sentence = describe(w, c);
+    return h('div', { class: `fc-auto ${w.enabled ? 'on' : ''}` },
+      h('div', { class: 'fc-row' },
+        h('label', { class: 'fc-switch', title: w.enabled ? 'En marche' : 'À l’arrêt' }, h('input', { type: 'checkbox', checked: w.enabled, onchange: (e) => guard(() => api.city.act({ type: 'workflow.toggle', id: w.id, enabled: e.target.checked })) }), h('span', {})),
+        h('b', { class: 'grow' }, w.name),
+        w.lastRun ? h('small', { title: w.lastRun.error || '' }, w.lastRun.ok ? '✅' : '❌') : null,
+      ),
+      h('ol', { class: 'fc-sentence small' }, ...sentence.map((x) => h('li', {}, h('span', {}, x.emoji), ' ', x.text))),
+      h('div', { class: 'fc-row wrap' },
+        h('button', { class: 'fc-btn small', onclick: () => guard(() => api.wf.run(w.id, 'sim')).then((r) => r && toast(r.ok ? '🧪 Essai réussi (données d’exemple)' : `❌ ${r.error}`, r.ok ? 'ok' : 'error')) }, '🧪 Essayer'),
+        !guest ? h('button', { class: 'fc-btn small', title: 'Lancer maintenant pour de vrai', onclick: () => guard(() => api.wf.run(w.id, 'real')).then((r) => r && toast(r.ok ? '✅ Fait pour de vrai !' : `❌ ${r.error}`, r.ok ? 'ok' : 'error')) }, '▶ Lancer maintenant') : null,
+        h('button', { class: 'fc-btn small', onclick: () => startLinking({ workflowId: w.id }) }, isLinear(w) ? '✏️ Modifier' : '✏️ Modifier (avancé)'),
+        h('button', { class: 'fc-icon-btn tiny', title: 'Supprimer', onclick: async () => (await confirmBox(`Supprimer « ${w.name} » ?`, { ok: 'Supprimer', danger: true })) && guard(() => api.city.act({ type: 'workflow.delete', id: w.id })) }, '🗑️'),
+      ),
+    );
+  });
+  return [
+    h('header', { class: 'fc-panel-head' }, h('span', { class: 'em' }, '📋'), h('div', { class: 'grow' }, h('b', { class: 'fc-panel-title' }, 'Mes automatisations'), h('small', {}, `${c.workflows.filter((w) => w.enabled).length} en marche`)), h('button', { class: 'fc-icon-btn', onclick: () => ((state.view = null), renderSelected()) }, '✕')),
+    h('div', { class: 'fc-panel-body' },
+      h('button', { class: 'fc-btn primary block', onclick: () => startLinking() }, '🔗 Créer une automatisation (relier des bâtiments)'),
+      c.workflows.length ? null : h('div', { class: 'fc-tip' }, h('b', {}, 'Comment ça marche ?'), h('p', {}, 'Une automatisation, c’est « quand il se passe ceci, fais cela ». Clique sur « Relier des bâtiments », puis sur le bâtiment du départ (ex. la Poste : « quand je reçois un mail »), puis sur celui qui agit (ex. la Tour radio : « préviens-moi sur mon téléphone »). C’est tout !')),
+      ...list,
+      h('details', { class: 'fc-adv' }, h('summary', {}, '🧩 Mode avancé (schéma)'), h('p', { class: 'fc-muted small' }, 'Pour les curieux : un éditeur en schéma, avec aiguillages oui/non, formules et API. Facultatif.'), h('button', { class: 'fc-btn small', onclick: () => openEditor() }, 'Ouvrir l’éditeur avancé')),
+    ),
+  ];
+}
+
+// ---------- Atelier des workflows (mode avancé, facultatif) ----------
 function openEditor(id) {
   select(null);
   if (state.world.mode === 'pov') state.world.setMode('orbit');
@@ -345,6 +419,7 @@ function colorOf(id) {
 }
 function buildingFor(node) {
   const c = city();
+  if (node.buildingId && c.buildings.some((b) => b.id === node.buildingId)) return node.buildingId;
   if (node.blueprint) {
     const b = c.buildings.find((x) => x.type === `bp:${node.blueprint}`);
     if (b) return b.id;
@@ -364,6 +439,7 @@ function flowSpec() {
       }
       return { id: w.id, color: colorOf(w.id), chain, lane: i % 4 };
     })
+    .concat(state.draft?.length > 1 ? [{ id: 'draft', color: '#ffffff', chain: state.draft.filter((b, i, a) => b !== a[i - 1]), lane: 0 }] : [])
     .filter((f) => f.chain.length > 1);
 }
 function animateStep(s) {
@@ -435,34 +511,24 @@ function chooseProfile(id) {
 }
 function welcome() {
   const c = city();
-  let chosen = null;
-  const autoBtn = h('button', { class: 'fc-btn primary', disabled: true, onclick: async () => {
-    const p = PROFILES.find((x) => x.id === chosen);
-    await guard(() => api.city.act({ type: 'city.profile', profile: chosen }));
-    const r = await guard(() => api.city.act({ type: 'autobuild', buildings: ['mairie', 'centrale', 'bibliotheque', ...p.buildings] }));
-    box.close();
-    if (r) {
-      toast('Ta ville de départ est prête. Choisis une recette à la Bibliothèque !', 'ok');
-      const lib = city().buildings.find((b) => b.type === 'bibliotheque');
-      const mairie = city().buildings.find((b) => b.type === 'mairie');
-      if (mairie) state.world.focus(mairie.id);
-      if (lib) select(lib.id);
-    }
-  } }, '🏗️ Construire ma ville de départ');
-  const selfBtn = h('button', { class: 'fc-btn', onclick: async () => {
-    if (chosen) await guard(() => api.city.act({ type: 'city.profile', profile: chosen }));
-    box.close();
-    state.category = 'essentiels';
-    renderBuildBar();
-    toast('À toi de jouer : commence par poser la Mairie (en bas, « Essentiels »).');
-  } }, 'Je pars d’une carte vide');
   const grid = h('div', { class: 'fc-profiles' }, ...PROFILES.map((p) => h('button', { class: 'fc-profile', onclick: (e) => {
-    chosen = p.id;
     grid.querySelectorAll('.fc-profile').forEach((x) => x.classList.remove('on'));
     e.currentTarget.classList.add('on');
-    autoBtn.disabled = false;
+    chooseProfile(p.id);
   } }, h('span', {}, p.emoji), h('b', {}, p.name), h('small', {}, p.desc))));
-  const box = modal(h('div', { class: 'fc-welcome' }, h('h2', {}, `Bienvenue, ${c.owner?.name?.split(' ')[0] || 'maire'} ! 🏙️`), h('p', {}, 'Ta carte est vide : c’est toi qui construis. Chaque bâtiment branche ta ville sur un outil réel, et tes workflows font circuler les données entre eux.'), h('p', { class: 'fc-muted' }, 'Qu’est-ce qui t’amène ? (tu pourras changer à la Mairie)'), grid, h('div', { class: 'fc-row end' }, selfBtn, autoBtn)), { wide: true });
+  const box = modal(h('div', { class: 'fc-welcome' },
+    h('div', { class: 'fc-welcome-logo' }, logoSvg(52), h('span', { class: 'fc-wordmark' }, h('span', { class: 'a' }, 'Flow'), h('span', { class: 'b' }, 'city'))),
+    h('h2', {}, `Bienvenue, ${c.owner?.name?.split(' ')[0] || 'maire'} !`),
+    h('p', {}, 'Ta carte est vide : c’est toi qui construis tout, comme dans SimCity. Chaque bâtiment représente un de tes outils (la Poste = tes mails, les Archives = tes fichiers…). Pour automatiser, tu relies simplement les bâtiments entre eux.'),
+    h('p', { class: 'fc-muted' }, 'Qu’est-ce qui t’intéresse ? Les bâtiments utiles seront marqués d’une ★ (facultatif).'),
+    grid,
+    h('div', { class: 'fc-row end' }, h('button', { class: 'fc-btn primary', onclick: () => {
+      box.close();
+      state.category = 'essentiels';
+      renderBuildBar();
+      toast('Commence par poser ta Mairie : en bas, onglet « Essentiels ».');
+    } }, 'C’est parti : je construis !')),
+  ), { wide: true });
 }
 
 boot().catch((e) => {

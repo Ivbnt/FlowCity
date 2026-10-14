@@ -1,4 +1,4 @@
-// Tests du cœur de FlowCity (moteur, ville, catalogue) : node --test tests/
+// Tests du cœur de Flowcity (moteur, ville, catalogue) : node --test tests/
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runWorkflow, validate, render, compare, createsCycle, nextScheduleTime } from '../shared/engine.mjs';
@@ -82,4 +82,20 @@ test('mode défi : coût et niveaux', () => {
   applyAction(c, { type: 'city.sandbox', on: false });
   applyAction(c, { type: 'place', building: 'mairie', x: 1, z: 1 });
   assert.throws(() => applyAction(c, { type: 'place', building: 'usine', x: 20, z: 20 }), /niveau/);
+});
+
+test('mode simple : étiquettes lisibles et phrases', async () => {
+  const { toFriendly, fromFriendly, describe, isLinear, SIMPLE_FIELDS } = await import('../shared/simple.mjs');
+  assert.equal(toFriendly('Mail de {{from}} : {{subject}} {{inconnu}}'), 'Mail de [Expéditeur] : [Objet] {{inconnu}}');
+  assert.equal(fromFriendly('Mail de [Expéditeur] le [Date du jour] [rien]'), 'Mail de {{from}} le {{$today}} [rien]');
+  assert.equal(SIMPLE_FIELDS['gmail.newEmail'].compose({ from: 'maman@x.fr', word: 'facture', attachment: true, unread: true }).query, 'in:inbox from:(maman@x.fr) "facture" has:attachment is:unread');
+  const c = newCity({});
+  applyAction(c, { type: 'place', building: 'mairie', x: 5, z: 5 });
+  applyAction(c, { type: 'place', building: 'poste', x: 12, z: 5 });
+  const [m, p] = c.buildings;
+  const w = { id: 'w', name: 'x', nodes: [{ id: 'a', op: 'gmail.newEmail', params: {}, simple: { from: 'Léa' }, buildingId: p.id }, { id: 'b', op: 'flow.notify', params: {}, buildingId: m.id }], edges: [{ from: 'a', to: 'b' }] };
+  const s = describe(w, c);
+  assert.equal(s[0].text, 'Quand je reçois un mail (de Léa)');
+  assert.match(s[1].text, /^Mairie affiche un message/);
+  assert.ok(isLinear(w));
 });

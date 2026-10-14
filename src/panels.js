@@ -22,7 +22,8 @@ export function renderPanel(ctx, building, arg) {
     h('button', { class: 'fc-icon-btn', title: 'Fermer', onclick: () => ctx.select(null) }, '✕'),
   );
   const access = !['deco', 'roads'].includes(def.category) && !hasRoadAccess(c, building) ? h('div', { class: 'fc-alert' }, '🚧 Pas de route devant ce bâtiment : les flux de données le rejoindront en volant. Trace une route qui le touche, ou :', h('button', { class: 'fc-btn small block', onclick: () => guard(() => ctx.api.city.act({ type: 'connect', id: building.id }), 'Bâtiment relié au réseau') }, '🛣️ Relier automatiquement à la route')) : null;
-  const body = h('div', { class: 'fc-panel-body' }, h('p', { class: 'fc-role' }, def.role), access);
+  const link = ctx.linkable(building) ? h('button', { class: 'fc-btn primary block big', onclick: () => ctx.startLinking({ buildingId: ctx.linkable(building) === 'trigger' ? building.id : undefined }) }, '🔗 Relier ce bâtiment à un autre') : null;
+  const body = h('div', { class: 'fc-panel-body' }, h('p', { class: 'fc-role' }, def.role), access, link);
   const fn = PANELS[def.panel] || (def.services ? servicePanel : def.blueprint ? blueprintBuildingPanel : genericPanel);
   body.append(...[].concat(fn(ctx, building, def, arg) || []).filter(Boolean));
   const foot = h('footer', { class: 'fc-panel-foot' },
@@ -51,7 +52,6 @@ function servicePanel(ctx, b, def) {
       ),
     );
   }
-  out.push(h('button', { class: 'fc-btn primary block', onclick: () => ctx.openEditor() }, '⚙️ Utiliser dans un workflow'));
   return out;
 }
 function genericPanel(ctx, b, def) {
@@ -61,7 +61,7 @@ function genericPanel(ctx, b, def) {
 function blueprintBuildingPanel(ctx, b, def) {
   const bp = def.blueprint;
   const what = bp.kind === 'workflow' ? `Lance le workflow « ${ctx.city().workflows.find((w) => w.id === bp.workflowId)?.name || '?'} »` : bp.kind === 'http' ? `Appelle ${bp.params?.url}` : `${SERVICES[bp.op.split('.')[0]]?.icon} ${opDef(bp.op)?.label}`;
-  return [section('Fonction', h('p', {}, what), h('p', { class: 'fc-muted small' }, 'Dans l’atelier des workflows, ce bâtiment apparaît dans la palette « Tes bâtiments sur mesure », déjà réglé.')), h('button', { class: 'fc-btn block', onclick: () => ctx.openPlace('architecte', bp.id) }, '📐 Modifier le plan')];
+  return [section('Fonction', h('p', {}, what), h('p', { class: 'fc-muted small' }, 'Quand tu relies des bâtiments, clique sur celui-ci : sa fonction est déjà réglée.')), h('button', { class: 'fc-btn block', onclick: () => ctx.openPlace('architecte', bp.id) }, '📐 Modifier le plan')];
 }
 
 // ---------- Mairie ----------
@@ -74,14 +74,14 @@ function mairie(ctx) {
     const cc = ctx.city();
     put(tasks, 
       ...cc.tasks.filter((t) => !t.done).slice(0, 12).map((t) => h('label', { class: `fc-task p${t.priority}` }, h('input', { type: 'checkbox', onchange: () => guard(() => ctx.api.city.act({ type: 'task.update', id: t.id, done: true })) }), h('span', {}, t.title), h('small', {}, t.source !== 'toi' ? `🤖 ${t.source}` : t.due || ''))),
-      cc.tasks.some((t) => !t.done) ? null : h('p', { class: 'fc-muted small' }, 'Aucune tâche en cours. Les workflows peuvent en créer pour toi (étape « Créer une tâche perso »).'),
+      cc.tasks.some((t) => !t.done) ? null : h('p', { class: 'fc-muted small' }, 'Aucune tâche en cours. Tes automatisations peuvent en créer pour toi (étape « Créer une tâche perso »).'),
     );
   };
   renderTasks();
   const add = h('input', { class: 'fc-input', placeholder: '+ Nouvelle tâche (Entrée)', onkeydown: async (e) => e.key === 'Enter' && e.target.value.trim() && (await guard(() => ctx.api.city.act({ type: 'task.add', title: e.target.value.trim() }))) && ((e.target.value = ''), renderTasks()) });
   const stats = [
     ['⏱️', fmtMinutes(savedMinutes(c)), 'temps gagné'],
-    ['⚙️', c.workflows.filter((w) => w.enabled).length, 'workflows actifs'],
+    ['⚙️', c.workflows.filter((w) => w.enabled).length, 'automatisations en marche'],
     ['🏗️', c.buildings.length, 'bâtiments'],
     ['🔌', c.connections.length, 'connexions'],
   ];
@@ -156,12 +156,13 @@ function bibliotheque(ctx) {
           h('div', { class: 'fc-row' }, h('b', { class: 'grow' }, t.name), h('small', { class: 'fc-pill' }, t.level)),
           h('p', { class: 'fc-muted small' }, t.desc),
           h('div', { class: 'fc-needs' }, ...t.needs.map((n) => h('span', { class: missing.includes(n) ? 'miss' : 'ok', title: BUILDINGS[n].name }, BUILDINGS[n].emoji))),
+          missing.length ? h('p', { class: 'fc-muted small' }, `À construire d’abord : ${missing.map((n) => `${BUILDINGS[n].emoji} ${BUILDINGS[n].name}`).join(', ')}`) : null,
           h('div', { class: 'fc-row' },
-            missing.length ? h('button', { class: 'fc-btn small', onclick: () => guard(() => ctx.api.city.act({ type: 'autobuild', buildings: missing }), `${plural(missing.length, 'bâtiment construit', 'bâtiments construits')}`).then(fill) }, `🏗️ Construire ${missing.length > 1 ? `les ${missing.length} bâtiments` : 'le bâtiment'}`) : null,
             h('button', { class: 'fc-btn small primary', onclick: async () => {
-              if (missing.length) await guard(() => ctx.api.city.act({ type: 'autobuild', buildings: missing }));
               const r = await guard(() => ctx.api.city.act({ type: 'workflow.fromTemplate', id: t.id }));
-              if (r) ctx.openEditor(r.info.id);
+              if (!r) return;
+              if (missing.length) toast('Recette ajoutée à « Mes automatisations ». Construis les bâtiments manquants pour la faire marcher.', 'warn');
+              else ctx.startLinking({ workflowId: r.info.id });
             } }, '➕ Utiliser cette recette'),
           ),
         );
@@ -176,7 +177,7 @@ function bibliotheque(ctx) {
     e.target.classList.add('on');
     fill();
   }
-  return [section('Recettes de workflows', h('p', { class: 'fc-muted small' }, 'Des automatisations toutes prêtes, à adapter. Les bâtiments manquants peuvent être construits pour toi.'), tabs, list), section('Glossaire', h('dl', { class: 'fc-glossary' }, ...GLOSSARY.flatMap(([t, d]) => [h('dt', {}, t), h('dd', {}, d)])))];
+  return [section('Recettes d’automatisations', h('p', { class: 'fc-muted small' }, 'Des automatisations toutes prêtes, à adapter à ta façon.'), tabs, list), section('Glossaire', h('dl', { class: 'fc-glossary' }, ...GLOSSARY.flatMap(([t, d]) => [h('dt', {}, t), h('dd', {}, d)])))];
 }
 
 // ---------- Centrale électrique : connexions ----------
@@ -189,7 +190,7 @@ function centrale(ctx, b, def, focusService) {
     st.session?.guest
       ? h('p', { class: 'fc-alert' }, 'Tu visites sans compte : tout fonctionne en simulation. Déconnecte-toi puis « Se connecter avec Google » pour agir sur tes vrais mails et fichiers.')
       : c.connections.includes('google')
-        ? h('div', {}, h('p', {}, `⚡ Connecté en tant que ${st.session?.email}`), h('div', { class: 'fc-row' }, h('button', { class: 'fc-btn small', onclick: () => guard(() => ctx.api.cred.test('google')).then((m) => m && toast(m, 'ok')) }, 'Tester'), h('button', { class: 'fc-btn small ghost', onclick: async () => (await confirmBox('Déconnecter Google ? Les workflows qui utilisent Gmail, Drive, Agenda ou Sheets s’arrêteront.', { ok: 'Déconnecter', danger: true })) && guard(() => ctx.api.auth.disconnectGoogle()).then(ctx.refreshStatus) }, 'Déconnecter')))
+        ? h('div', {}, h('p', {}, `⚡ Connecté en tant que ${st.session?.email}`), h('div', { class: 'fc-row' }, h('button', { class: 'fc-btn small', onclick: () => guard(() => ctx.api.cred.test('google')).then((m) => m && toast(m, 'ok')) }, 'Tester'), h('button', { class: 'fc-btn small ghost', onclick: async () => (await confirmBox('Déconnecter Google ? Les automatisations qui utilisent Gmail, Drive, Agenda ou Sheets s’arrêteront.', { ok: 'Déconnecter', danger: true })) && guard(() => ctx.api.auth.disconnectGoogle()).then(ctx.refreshStatus) }, 'Déconnecter')))
         : h('div', {}, h('p', { class: 'fc-muted' }, 'Google n’est plus connecté.'), h('button', { class: 'fc-btn primary', onclick: () => guard(() => ctx.api.auth.google()).then(ctx.refreshStatus) }, 'Reconnecter Google')),
   );
   out.push(h('p', { class: 'fc-muted small' }, st.encrypted ? '🔒 Les clés sont chiffrées sur ton ordinateur et ne quittent jamais ta machine (sauf vers le service concerné).' : st.demo ? 'Aperçu navigateur : les informations restent dans ce navigateur.' : '⚠️ Chiffrement indisponible sur ce système : les clés sont stockées en clair.'), google);
@@ -227,7 +228,7 @@ function centrale(ctx, b, def, focusService) {
 // ---------- Laboratoire IA (assistant) ----------
 function labo(ctx, b, def) {
   const out = servicePanel(ctx, b, def);
-  const log = h('div', { class: 'fc-chat-log' }, ...(ctx.chat.history.length ? ctx.chat.history.map(chatBubble) : [h('div', { class: 'fc-bubble ai' }, 'Salut ! Je suis Claude, ton assistant d’automatisation. Dis-moi ce que tu voudrais automatiser (« ranger mes factures », « suivre mes candidatures »…) et je t’aide à construire le workflow, pas à pas.')]));
+  const log = h('div', { class: 'fc-chat-log' }, ...(ctx.chat.history.length ? ctx.chat.history.map(chatBubble) : [h('div', { class: 'fc-bubble ai' }, 'Salut ! Je suis Claude, ton assistant d’automatisation. Dis-moi ce que tu voudrais automatiser (« ranger mes factures », « suivre mes candidatures »…) et je t’aide à la construire, pas à pas.')]));
   const input = h('textarea', { class: 'fc-input', rows: 2, placeholder: 'Ex. : je veux être prévenu quand un recruteur me répond' });
   const send = async () => {
     const text = input.value.trim();
@@ -240,7 +241,7 @@ function labo(ctx, b, def) {
   };
   input.addEventListener('keydown', (e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), send()));
   ctx.chat.log = log;
-  out.unshift(section('✳️ Assistant Claude', log, h('div', { class: 'fc-row' }, input, h('button', { class: 'fc-btn primary', onclick: send }, 'Envoyer')), h('div', { class: 'fc-row' }, h('small', { class: 'fc-muted grow' }, ctx.status().claude ? 'Claude voit ta ville et peut te proposer des workflows (tu valides avant création).' : '🔌 Branche ta clé Claude à la Centrale électrique pour discuter.'), h('button', { class: 'fc-btn small ghost', onclick: () => ((ctx.chat.history = []), ctx.api.assistant.reset(), put(log)) }, 'Nouvelle discussion'))));
+  out.unshift(section('✳️ Assistant Claude', log, h('div', { class: 'fc-row' }, input, h('button', { class: 'fc-btn primary', onclick: send }, 'Envoyer')), h('div', { class: 'fc-row' }, h('small', { class: 'fc-muted grow' }, ctx.status().claude ? 'Claude voit ta ville et peut te proposer des automatisations (tu valides avant création).' : '🔌 Branche ta clé Claude à la Centrale électrique pour discuter.'), h('button', { class: 'fc-btn small ghost', onclick: () => ((ctx.chat.history = []), ctx.api.assistant.reset(), put(log)) }, 'Nouvelle discussion'))));
   return out;
 }
 export function chatBubble(m) {
@@ -364,7 +365,7 @@ function caserne(ctx) {
   const c = ctx.city();
   const fails = c.runs.filter((r) => !r.ok).slice(0, 20);
   return [
-    section(`🔥 Incendies récents (${fails.length})`, fails.length ? null : h('p', { class: 'fc-muted' }, 'Aucun incendie : tous tes workflows tournent bien. 👏'), ...fails.map((r) => h('div', { class: 'fc-fail' }, h('div', { class: 'fc-row' }, h('b', { class: 'grow' }, r.workflowName), h('small', {}, fmtDate(r.at))), h('p', { class: 'fc-alert inline' }, r.error), h('p', { class: 'fc-muted small' }, explainError(r.error)), h('div', { class: 'fc-row' }, h('button', { class: 'fc-btn small', onclick: () => ctx.openEditor(r.workflowId) }, 'Ouvrir le workflow'), h('button', { class: 'fc-btn small', onclick: () => guard(() => ctx.api.wf.run(r.workflowId)) }, '↻ Relancer'))))),
+    section(`🔥 Incendies récents (${fails.length})`, fails.length ? null : h('p', { class: 'fc-muted' }, 'Aucun incendie : tous tes workflows tournent bien. 👏'), ...fails.map((r) => h('div', { class: 'fc-fail' }, h('div', { class: 'fc-row' }, h('b', { class: 'grow' }, r.workflowName), h('small', {}, fmtDate(r.at))), h('p', { class: 'fc-alert inline' }, r.error), h('p', { class: 'fc-muted small' }, explainError(r.error)), h('div', { class: 'fc-row' }, h('button', { class: 'fc-btn small', onclick: () => ctx.startLinking({ workflowId: r.workflowId }) }, 'Ouvrir l’automatisation'), h('button', { class: 'fc-btn small', onclick: () => guard(() => ctx.api.wf.run(r.workflowId)) }, '↻ Relancer'))))),
     section('🚨 Alerte en cas d’erreur', h('p', { class: 'fc-muted small' }, 'Quand un workflow coché échoue, tu reçois une notification (et sur ton téléphone si ntfy est branché).'), ...c.workflows.map((w) => h('label', { class: 'fc-check' }, h('input', { type: 'checkbox', checked: w.alertOnError, onchange: (e) => guard(() => ctx.api.city.act({ type: 'workflow.save', workflow: { ...w, alertOnError: e.target.checked } })) }), w.name))),
   ];
 }
@@ -374,7 +375,7 @@ function explainError(e = '') {
   if (/404|introuvable/i.test(e)) return '💡 Quelque chose n’existe pas (identifiant de fichier, de dossier, adresse) : vérifie les champs de l’étape.';
   if (/429|Trop/i.test(e)) return '💡 Le service reçoit trop de demandes : espace les exécutions ou ajoute une Limite.';
   if (/obligatoire|vide|manquant/i.test(e)) return '💡 Un champ obligatoire est vide (parfois une {{variable}} qui n’existe pas).';
-  return '💡 Ouvre le workflow, regarde l’étape en rouge et le message d’erreur dans le journal d’exécution.';
+  return '💡 Ouvre l’automatisation (bouton Modifier) et vérifie les réglages de chaque étape.';
 }
 
 // ---------- Hôpital : bilan de santé ----------
@@ -385,7 +386,7 @@ function hopital(ctx) {
     const issues = validate(w, { isAvailable: (op) => availableServicesHas(c, op), isConnected: (op) => isConn(conns, op), real: w.mode === 'real' });
     const errors = issues.filter((i) => i.level === 'error');
     const rate = w.stats?.runs ? Math.round((w.stats.ok / w.stats.runs) * 100) : null;
-    return h('div', { class: 'fc-health' }, h('span', {}, errors.length ? '🤒' : issues.length ? '🤧' : '💪'), h('div', { class: 'grow' }, h('b', {}, w.name), h('small', { class: 'fc-muted' }, errors[0]?.text || issues[0]?.text || 'En pleine forme.')), rate !== null ? h('span', { class: 'fc-pill' }, `${rate} % de réussite`) : null, h('button', { class: 'fc-btn small ghost', onclick: () => ctx.openEditor(w.id) }, 'Soigner'));
+    return h('div', { class: 'fc-health' }, h('span', {}, errors.length ? '🤒' : issues.length ? '🤧' : '💪'), h('div', { class: 'grow' }, h('b', {}, w.name), h('small', { class: 'fc-muted' }, errors[0]?.text || issues[0]?.text || 'En pleine forme.')), rate !== null ? h('span', { class: 'fc-pill' }, `${rate} % de réussite`) : null, h('button', { class: 'fc-btn small ghost', onclick: () => ctx.startLinking({ workflowId: w.id }) }, 'Soigner'));
   });
   const testAll = async () => {
     for (const s of ['google', ...conns.filter((x) => x !== 'google')]) {
@@ -412,7 +413,7 @@ function commissariat(ctx) {
   const writers = c.workflows.filter((w) => w.nodes.some((n) => opDef(n.op)?.write));
   return [
     section('Règles de prudence', h('ul', { class: 'fc-list' }, h('li', {}, 'Teste toujours en 🧪 simulation avant de passer en ⚡ réel.'), h('li', {}, 'Mets « Demander mon accord » avant une action sensible (mail à un client, publication…).'), h('li', {}, 'Ajoute une « Limite » après une recherche pour ne jamais traiter 200 éléments d’un coup.'), h('li', {}, 'Ne colle jamais une clé ailleurs qu’à la Centrale électrique.'))),
-    section(`Workflows qui agissent pour toi (${writers.length})`, ...writers.map((w) => h('div', { class: 'fc-health' }, h('span', {}, w.mode === 'real' ? '⚡' : '🧪'), h('div', { class: 'grow' }, h('b', {}, w.name), h('small', { class: 'fc-muted' }, w.nodes.filter((n) => opDef(n.op)?.write).map((n) => opDef(n.op).label).join(', '))), w.nodes.some((n) => n.op === 'logic.approval') ? h('span', { class: 'fc-pill ok' }, 'avec accord') : h('span', { class: 'fc-pill warn' }, 'sans accord'), h('button', { class: 'fc-btn small ghost', onclick: () => ctx.openEditor(w.id) }, 'Voir'))), writers.length ? null : h('p', { class: 'fc-muted' }, 'Aucun workflow n’écrit encore dans tes comptes.')),
+    section(`Workflows qui agissent pour toi (${writers.length})`, ...writers.map((w) => h('div', { class: 'fc-health' }, h('span', {}, w.mode === 'real' ? '⚡' : '🧪'), h('div', { class: 'grow' }, h('b', {}, w.name), h('small', { class: 'fc-muted' }, w.nodes.filter((n) => opDef(n.op)?.write).map((n) => opDef(n.op).label).join(', '))), w.nodes.some((n) => n.op === 'logic.approval') ? h('span', { class: 'fc-pill ok' }, 'avec accord') : h('span', { class: 'fc-pill warn' }, 'sans accord'), h('button', { class: 'fc-btn small ghost', onclick: () => ctx.startLinking({ workflowId: w.id }) }, 'Voir'))), writers.length ? null : h('p', { class: 'fc-muted' }, 'Aucun workflow n’écrit encore dans tes comptes.')),
   ];
 }
 

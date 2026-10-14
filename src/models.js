@@ -1,4 +1,4 @@
-// Modèles 3D procéduraux des bâtiments de FlowCity (style maquette « low-poly »).
+// Modèles 3D procéduraux des bâtiments de Flowcity (style maquette « low-poly »).
 // Chaque forme (shape) est construite à partir de primitives ; l'origine est au centre de l'emprise, au sol.
 import * as THREE from 'three';
 

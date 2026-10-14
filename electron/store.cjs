@@ -1,4 +1,4 @@
-// Stockage local de FlowCity (dossier userData d'Electron) : une ville par compte Google,
+// Stockage local de Flowcity (dossier userData d'Electron) : une ville par compte Google,
 // réglages, et secrets chiffrés avec safeStorage (DPAPI sous Windows, Trousseau sous macOS).
 const fs = require('fs');
 const path = require('path');

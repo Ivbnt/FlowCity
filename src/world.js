@@ -1,4 +1,4 @@
-// Monde 3D de FlowCity : terrain vide, grille de construction, bâtiments, routes, flux de données
+// Monde 3D de Flowcity : terrain vide, grille de construction, bâtiments, routes, flux de données
 // (les workflows actifs circulent en permanence entre leurs bâtiments ; un test envoie des colis),
 // jour / nuit, vue d'ensemble ou balade à pied (POV).
 import * as THREE from 'three';
@@ -197,6 +197,25 @@ export class World {
     this.updateAccess();
     this.buildRoads();
     this.buildFlows();
+    this.applyLinking();
+  }
+
+  // Mode « relier des bâtiments » : bâtiments utilisables en surbrillance, les autres estompés,
+  // et numéro d'étape (①②③…) sur ceux déjà reliés. info = { eligible: Set, chain: [ids] } | null
+  setLinking(info) {
+    this.linking = info;
+    this.applyLinking();
+  }
+  applyLinking() {
+    const info = this.linking;
+    this.el.dataset.linking = info ? '1' : '';
+    for (const [id, o] of this.objects) {
+      const steps = info ? info.chain.map((b, i) => (b === id ? i + 1 : 0)).filter(Boolean) : [];
+      o.tag.classList.toggle('eligible', Boolean(info?.eligible.has(id)));
+      o.tag.classList.toggle('dim', Boolean(info && !info.eligible.has(id) && !steps.length));
+      o.tag.dataset.step = steps.join(' · ');
+      o.tag.classList.toggle('linked', steps.length > 0);
+    }
   }
   makeBuilding(b, def, sig) {
     const fp = footprint(b, this.city.blueprints);

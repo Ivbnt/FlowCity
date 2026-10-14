@@ -21,7 +21,7 @@ jobs:
         run: npx --yes electron-builder@25.1.8 --win nsis portable --x64 --publish never
       - uses: actions/upload-artifact@v4
         with:
-          name: FlowCity-windows
+          name: Flowcity-windows
           path: |
             release/*.exe
           if-no-files-found: error

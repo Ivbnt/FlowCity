@@ -1,4 +1,4 @@
-// FlowCity — processus principal : fenêtre, session Google, ville (état autoritaire), exécution des
+// Flowcity — processus principal : fenêtre, session Google, ville (état autoritaire), exécution des
 // workflows (simulation ou réel), planificateur, Gare (serveur webhook local), assistant Claude.
 const path = require('path');
 const fs = require('fs');
@@ -10,7 +10,7 @@ const google = require('./google.cjs');
 const { createConnectors, testService } = require('./connectors.cjs');
 const assistant = require('./assistant.cjs');
 
-app.setName('FlowCity');
+app.setName('Flowcity');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('force_high_performance_gpu');
@@ -184,9 +184,9 @@ async function execute(wf, { mode = wf.mode || 'sim', source = 'manuel', trigger
 }
 function alertError(wf, result) {
   const text = `« ${wf.name} » a échoué : ${result.error}`;
-  if (Notification.isSupported()) new Notification({ title: '🚒 FlowCity — incendie !', body: text }).show();
+  if (Notification.isSupported()) new Notification({ title: '🚒 Flowcity — incendie !', body: text }).show();
   const n = cred('ntfy');
-  if (n?.topic) fetch(`${(n.server || 'https://ntfy.sh').replace(/\/+$/, '')}/${encodeURIComponent(n.topic)}`, { method: 'POST', headers: { Title: 'FlowCity : workflow en erreur', Priority: '4', Tags: 'fire' }, body: text }).catch(() => {});
+  if (n?.topic) fetch(`${(n.server || 'https://ntfy.sh').replace(/\/+$/, '')}/${encodeURIComponent(n.topic)}`, { method: 'POST', headers: { Title: 'Flowcity : workflow en erreur', Priority: '4', Tags: 'fire' }, body: text }).catch(() => {});
 }
 
 // ---------- Planificateur ----------
@@ -327,14 +327,14 @@ function registerIpc() {
   h('city:get', () => getCity());
   h('city:act', (action) => act(action));
   h('city:export', async () => {
-    const r = await dialog.showSaveDialog(win, { title: 'Sauvegarder ma ville', defaultPath: `${getCity().name}.flowcity.json`, filters: [{ name: 'Ville FlowCity', extensions: ['json'] }] });
+    const r = await dialog.showSaveDialog(win, { title: 'Sauvegarder ma ville', defaultPath: `${getCity().name}.flowcity.json`, filters: [{ name: 'Ville Flowcity', extensions: ['json'] }] });
     if (r.canceled) return false;
     const c = getCity();
     fs.writeFileSync(r.filePath, JSON.stringify({ ...c, runs: [], journal: c.journal.slice(0, 50) }, null, 2));
     return true;
   });
   h('city:import', async () => {
-    const r = await dialog.showOpenDialog(win, { title: 'Ouvrir une ville', filters: [{ name: 'Ville FlowCity', extensions: ['json'] }], properties: ['openFile'] });
+    const r = await dialog.showOpenDialog(win, { title: 'Ouvrir une ville', filters: [{ name: 'Ville Flowcity', extensions: ['json'] }], properties: ['openFile'] });
     if (r.canceled || !r.filePaths[0]) return null;
     const raw = JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8'));
     const c = S.city.migrateCity({ ...raw, owner: getCity().owner, connections: connections() });
@@ -424,7 +424,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 640,
     backgroundColor: '#0d1424',
-    title: 'FlowCity',
+    title: 'Flowcity',
     titleBarStyle: 'hidden',
     titleBarOverlay: { color: '#00000000', symbolColor: '#e8edf7', height: 40 },
     icon: path.join(__dirname, '..', 'build', 'icon.png'),

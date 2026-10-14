@@ -1,4 +1,4 @@
-// Moteur d'exécution des workflows de FlowCity (partagé : processus principal + aperçu navigateur).
+// Moteur d'exécution des workflows de Flowcity (partagé : processus principal + aperçu navigateur).
 //
 // Un workflow = des étapes (nodes) reliées par des flèches (edges). La première étape est un
 // déclencheur ; il produit des « éléments » (items : un mail, un fichier, une ligne…). Chaque

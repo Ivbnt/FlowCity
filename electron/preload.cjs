@@ -1,4 +1,4 @@
-// Pont sécurisé entre l'interface de FlowCity et le processus principal.
+// Pont sécurisé entre l'interface de Flowcity et le processus principal.
 const { contextBridge, ipcRenderer } = require('electron');
 
 const invoke = (ch) => (...args) => ipcRenderer.invoke(ch, ...args);

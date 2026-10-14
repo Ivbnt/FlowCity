@@ -1,4 +1,4 @@
-// Les bâtiments de FlowCity. Chaque bâtiment a un rôle : soit un rôle « civique » prédéfini
+// Les bâtiments de Flowcity. Chaque bâtiment a un rôle : soit un rôle « civique » prédéfini
 // (Mairie, École, Centrale…), soit il héberge un ou plusieurs services (la Poste = Gmail,
 // les Archives = Google Drive…), soit il est modulable (Atelier) ou créé sur mesure (Architecte).
 //
@@ -70,7 +70,7 @@ export const BUILDINGS = {
     level: 2,
     unique: true,
     panel: 'bibliotheque',
-    role: 'Le savoir : glossaire de l’automatisation (API, webhook, OAuth, JSON…) et recettes de workflows prêtes à l’emploi.',
+    role: 'Le savoir : glossaire de l’automatisation (API, webhook, OAuth, JSON…) et recettes d’automatisations prêtes à l’emploi.',
     style: { shape: 'hall', color: '#d9c7a7', accent: '#8a5a2b', floors: 1 },
   },
   architecte: {
@@ -82,7 +82,7 @@ export const BUILDINGS = {
     level: 2,
     unique: true,
     panel: 'architecte',
-    role: 'Crée tes propres bâtiments : nom, forme, couleur et surtout la fonction que tu veux (une action, une API, un workflow entier).',
+    role: 'Crée tes propres bâtiments : nom, forme, couleur et surtout la fonction que tu veux (une action, une API, une automatisation entière).',
     style: { shape: 'office', color: '#b7e3f0', accent: '#2a9fd6', floors: 3 },
   },
   caserne: {
@@ -106,7 +106,7 @@ export const BUILDINGS = {
     level: 4,
     unique: true,
     panel: 'hopital',
-    role: 'Bilan de santé : teste chaque connexion et chaque workflow pour repérer ce qui est malade (jeton expiré, champ manquant…).',
+    role: 'Bilan de santé : teste chaque connexion et chaque automatisation pour repérer ce qui est malade (jeton expiré, champ manquant…).',
     style: { shape: 'hospital', color: '#f4f7fb', accent: '#2fd17a', floors: 3 },
   },
   commissariat: {
@@ -118,7 +118,7 @@ export const BUILDINGS = {
     level: 4,
     unique: true,
     panel: 'commissariat',
-    role: 'La sécurité : demandes d’accord en attente, règles (quels workflows ont le droit d’écrire, d’envoyer), journal d’audit.',
+    role: 'La sécurité : demandes d’accord en attente, règles (quelles automatisations ont le droit d’écrire, d’envoyer), journal d’audit.',
     style: { shape: 'police', color: '#3a5bd9', accent: '#e8eefc', floors: 2 },
   },
   observatoire: {
@@ -130,7 +130,7 @@ export const BUILDINGS = {
     level: 5,
     unique: true,
     panel: 'observatoire',
-    role: 'Les statistiques : exécutions par jour, temps gagné, workflows les plus utiles.',
+    role: 'Les statistiques : exécutions par jour, temps gagné, automatisations les plus utiles.',
     style: { shape: 'observatory', color: '#e4e7ee', accent: '#5c6bc0', floors: 1 },
   },
   maison: {
@@ -242,7 +242,7 @@ export const BUILDINGS = {
     level: 3,
     unique: true,
     services: ['webhook'],
-    role: 'Les arrivées : une adresse web qui démarre ton workflow quand un formulaire, un site ou un autre outil l’appelle.',
+    role: 'Les arrivées : une adresse web qui démarre ton automatisation quand un formulaire, un site ou un autre outil l’appelle.',
     style: { shape: 'station', color: '#c9b79c', accent: '#2c3e50', floors: 1 },
   },
   tour_dev: {
@@ -364,7 +364,7 @@ export const BUILDINGS = {
   // ---------------- Décoration ----------------
   arbre: { name: 'Arbre', emoji: '🌳', category: 'deco', size: [1, 1], cost: 5, level: 1, happiness: 1, role: 'De l’ombre et de la bonne humeur.', style: { shape: 'tree', color: '#3fa34d' } },
   parc: { name: 'Parc', emoji: '🌷', category: 'deco', size: [2, 2], cost: 40, level: 1, happiness: 5, role: 'Un parc avec bancs et fleurs. Les habitants adorent.', style: { shape: 'park', color: '#58b368' } },
-  residence: { name: 'Résidence', emoji: '🏘️', category: 'deco', size: [1, 1], cost: 40, level: 2, population: 8, role: 'Des habitants qui paient des impôts chaque jour (plus il y a de workflows actifs, plus ils sont contents).', style: { shape: 'residence', color: '#f0d9c4', accent: '#7b5e57', floors: 3 } },
+  residence: { name: 'Résidence', emoji: '🏘️', category: 'deco', size: [1, 1], cost: 40, level: 2, population: 8, role: 'Des habitants qui paient des impôts chaque jour (plus il y a de automatisations en marche, plus ils sont contents).', style: { shape: 'residence', color: '#f0d9c4', accent: '#7b5e57', floors: 3 } },
   immeuble: { name: 'Immeuble', emoji: '🏢', category: 'deco', size: [2, 2], cost: 120, level: 3, population: 40, role: 'Beaucoup d’habitants (et d’impôts).', style: { shape: 'tower', color: '#d9dee7', accent: '#4f8bff', floors: 6 } },
   fontaine: { name: 'Fontaine', emoji: '⛲', category: 'deco', size: [2, 2], cost: 80, level: 2, happiness: 8, role: 'Une place avec une fontaine.', style: { shape: 'fountain', color: '#cfd8e3' } },
   lampadaire: { name: 'Lampadaire', emoji: '💡', category: 'deco', size: [1, 1], cost: 3, level: 1, happiness: 0, role: 'Éclaire les rues la nuit.', style: { shape: 'lamp' } },

@@ -1,4 +1,4 @@
-// Connexion Google de FlowCity : un seul consentement donne l'identité (profil) + Gmail + Drive
+// Connexion Google de Flowcity : un seul consentement donne l'identité (profil) + Gmail + Drive
 // + Agenda + Sheets. OAuth « application de bureau » avec PKCE et serveur local éphémère.
 // Les jetons sont rangés chiffrés, par compte (`<email>:google`).
 const http = require('http');
@@ -39,7 +39,7 @@ function authFlow() {
       const code = url.searchParams.get('code');
       const err = url.searchParams.get('error');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(`<body style="font-family:system-ui;background:#0e1420;color:#fff;display:grid;place-items:center;height:100vh;margin:0"><div style="text-align:center"><div style="font-size:64px">${err ? '🚧' : '🏙️'}</div><h2>${err ? 'Connexion refusée' : 'Bienvenue dans FlowCity !'}</h2><p>Tu peux fermer cet onglet et retourner dans l’application.</p></div></body>`);
+      res.end(`<body style="font-family:system-ui;background:#0e1420;color:#fff;display:grid;place-items:center;height:100vh;margin:0"><div style="text-align:center"><div style="font-size:64px">${err ? '🚧' : '🏙️'}</div><h2>${err ? 'Connexion refusée' : 'Bienvenue dans Flowcity !'}</h2><p>Tu peux fermer cet onglet et retourner dans l’application.</p></div></body>`);
       server.close();
       clearTimeout(timer);
       if (err || url.searchParams.get('state') !== state) return reject(new Error(err === 'access_denied' ? 'Connexion annulée.' : err || 'État OAuth invalide'));

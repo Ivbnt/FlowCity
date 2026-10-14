@@ -1,9 +1,9 @@
 {
   "name": "flowcity",
-  "productName": "FlowCity",
+  "productName": "Flowcity",
   "version": "1.0.0",
-  "description": "FlowCity : construis ta ville, automatise ta vie. Un bac à sable façon SimCity pour apprendre et créer des workflows (Gmail, Drive, Slack, Notion, IA…).",
-  "author": "FlowCity",
+  "description": "Flowcity : construis ta ville, automatise ta vie. Un bac à sable façon SimCity pour apprendre et créer des workflows (Gmail, Drive, Slack, Notion, IA…).",
+  "author": "Flowcity",
   "license": "UNLICENSED",
   "main": "electron/main.cjs",
   "scripts": {
@@ -19,7 +19,7 @@
   },
   "build": {
     "appId": "app.flowcity",
-    "productName": "FlowCity",
+    "productName": "Flowcity",
     "directories": {
       "output": "release"
     },
@@ -40,10 +40,10 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "FlowCity"
+      "shortcutName": "Flowcity"
     },
     "portable": {
-      "artifactName": "FlowCity-portable-${version}.exe"
+      "artifactName": "Flowcity-portable-${version}.exe"
     },
     "extraFiles": [
       {

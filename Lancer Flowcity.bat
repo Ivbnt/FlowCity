@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title FlowCity
+title Flowcity
 cd /d "%~dp0"
 where node >nul 2>nul
 if errorlevel 1 (
@@ -16,6 +16,6 @@ rem Le lanceur installe seulement si besoin, ne reconstruit que si le code a cha
 node scripts\launch.cjs
 if errorlevel 1 (
   echo.
-  echo  FlowCity n'a pas pu demarrer : voir le message au-dessus.
+  echo  Flowcity n'a pas pu demarrer : voir le message au-dessus.
   pause
 )

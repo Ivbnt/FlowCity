@@ -1,10 +1,10 @@
-// Exécution réelle des étapes de FlowCity : chaque opération du catalogue (shared/flowcity/services.mjs)
+// Exécution réelle des étapes de Flowcity : chaque opération du catalogue (shared/flowcity/services.mjs)
 // a ici son implémentation (appel d'API). Les identifiants viennent de la Centrale électrique (chiffrés).
 const vm = require('vm');
 const Anthropic = require('@anthropic-ai/sdk');
 const google = require('./google.cjs');
 
-const UA = 'FlowCity/1.0 (+https://github.com/Ivbnt/FlowCity)';
+const UA = 'Flowcity/1.0 (+https://github.com/Ivbnt/Flowcity)';
 const MAX_DOWNLOAD = 15 * 1024 * 1024;
 
 async function fetchJson(url, opts = {}, label = 'Service') {
@@ -97,7 +97,7 @@ function createConnectors(ctx) {
     'flow.schedule': async () => [{ firedAt: new Date().toISOString(), weekday: new Date().toLocaleDateString('fr-FR', { weekday: 'long' }) }],
     'flow.task': async (p) => ({ taskId: ctx.addTask({ title: p.title, priority: Number(p.priority) || 2, due: p.due || null }).id }),
     'flow.note': async (p) => (ctx.journal(`📝 ${p.text}`), {}),
-    'flow.notify': async (p) => (ctx.notify(p.title || 'FlowCity', p.text || ''), {}),
+    'flow.notify': async (p) => (ctx.notify(p.title || 'Flowcity', p.text || ''), {}),
     'flow.subflow': async (p, item, run) => ({ subResult: await ctx.runSubflow(p.workflowId, item, (run.depth || 0) + 1) }),
 
     // ----- Gmail -----
@@ -215,7 +215,7 @@ function createConnectors(ctx) {
     },
     'discord.send': async (p) => {
       const c = need('discord', 'webhook');
-      const r = await fetch(c.webhook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: String(p.text).slice(0, 2000), username: p.username || 'FlowCity' }) });
+      const r = await fetch(c.webhook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: String(p.text).slice(0, 2000), username: p.username || 'Flowcity' }) });
       if (!r.ok) throw new Error(`Discord ${r.status} : ${(await r.text()).slice(0, 100)}`);
       return {};
     },
@@ -245,7 +245,7 @@ function createConnectors(ctx) {
     'ntfy.send': async (p) => {
       const c = need('ntfy', 'topic');
       const server = (c.server || 'https://ntfy.sh').replace(/\/+$/, '');
-      const r = await fetch(`${server}/${encodeURIComponent(c.topic)}`, { method: 'POST', headers: { Title: encodeURIComponent(p.title || 'FlowCity'), Priority: String(p.priority || 3), Tags: 'cityscape' }, body: p.text });
+      const r = await fetch(`${server}/${encodeURIComponent(c.topic)}`, { method: 'POST', headers: { Title: encodeURIComponent(p.title || 'Flowcity'), Priority: String(p.priority || 3), Tags: 'cityscape' }, body: p.text });
       if (!r.ok) throw new Error(`ntfy ${r.status}`);
       return {};
     },
@@ -494,14 +494,14 @@ async function testService(service, c, { email } = {}) {
     case 'outlook': return `Compte ${(await fetchJson('https://graph.microsoft.com/v1.0/me', { headers: bearer(c.token) }, 'Microsoft')).userPrincipalName}`;
     case 'ntfy': {
       const server = (c.server || 'https://ntfy.sh').replace(/\/+$/, '');
-      const r = await fetch(`${server}/${encodeURIComponent(c.topic)}`, { method: 'POST', headers: { Title: 'FlowCity', Tags: 'white_check_mark' }, body: 'Connexion réussie : ta ville peut te prévenir !' });
+      const r = await fetch(`${server}/${encodeURIComponent(c.topic)}`, { method: 'POST', headers: { Title: 'Flowcity', Tags: 'white_check_mark' }, body: 'Connexion réussie : ta ville peut te prévenir !' });
       if (!r.ok) throw new Error(`ntfy ${r.status}`);
       return 'Notification de test envoyée sur ton téléphone';
     }
     case 'slack':
     case 'discord':
     case 'teams': {
-      const body = service === 'discord' ? { content: '✅ FlowCity est connecté à ce salon !', username: 'FlowCity' } : { text: '✅ FlowCity est connecté à ce canal !' };
+      const body = service === 'discord' ? { content: '✅ Flowcity est connecté à ce salon !', username: 'Flowcity' } : { text: '✅ Flowcity est connecté à ce canal !' };
       const r = await fetch(c.webhook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (!r.ok) throw new Error(`${service} ${r.status}`);
       return 'Message de test envoyé';

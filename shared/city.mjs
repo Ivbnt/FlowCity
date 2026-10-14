@@ -395,7 +395,7 @@ export function applyAction(city, action) {
         desc: String(w.desc || '').slice(0, 500),
         createdAt: w.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        nodes: (w.nodes || []).slice(0, 60).map((n) => ({ id: n.id, op: n.op, label: n.label || '', params: n.params || {}, x: Number(n.x) || 0, y: Number(n.y) || 0, ...(n.blueprint ? { blueprint: n.blueprint } : {}) })),
+        nodes: (w.nodes || []).slice(0, 60).map((n) => ({ id: n.id, op: n.op, label: n.label || '', params: n.params || {}, x: Number(n.x) || 0, y: Number(n.y) || 0, ...(n.blueprint ? { blueprint: n.blueprint } : {}), ...(n.buildingId ? { buildingId: n.buildingId } : {}), ...(n.simple ? { simple: n.simple } : {}) })),
         edges: [],
         stats: w.stats,
         lastRun: w.lastRun,
